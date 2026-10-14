@@ -22,11 +22,18 @@ Sensor: Capacitive Soil Moisture Sensor v2.0 (HW-390). Das SuperMini führt GPIO
                   ├── GPIO1
                   └──[100nF]── GND
 ```
-Der Teiler erkennt USB (> 4,5 V am 5V-Pin) und misst im Akkubetrieb die Akkuspannung.
+Der Teiler besteht aus **zwei gleichen Widerständen** (Faktor 2, Wert frei: 100 kΩ bis 1 MΩ; größer = weniger
+Dauerstrom, 2×1 MΩ ≈ 2 µA). Der 100-nF-Kondensator puffert den ADC bei hohen Widerstandswerten. Er erkennt USB
+(> 4,5 V am 5V-Pin) und misst im Akkubetrieb die Akkuspannung. **Kalibrierung:** In der Weboberfläche die mit
+dem Multimeter gemessene Spannung eintragen, daraus wird ein Korrekturfaktor berechnet (Toleranz, ADC-Offset).
 
-**Versorgung:** Das Board hat keinen Lader. LiPo (3,0–4,2 V) an den **5V-Pin** (Onboard-Regler),
-nicht an 3.3 (zu viel Spannung). Laden extern (z. B. TP4056). Bei gleichzeitigem Akku am 5V-Pin
-und USB-Anschluss ggf. eine Schottky-Diode in die Akkuleitung setzen.
+**Versorgung (laut [SuperMini-Schaltplan](https://make.net.za/wp-content/datasheets/ESP32-C3%20SuperMini%20Schematic.pdf)):**
+Der 5V-Pin liegt direkt am USB-VBUS und über eine Schottky-Diode (BAT60J) am 3,3-V-Regler (ME6211). Ein LiPo
+(3,0–4,2 V) am 5V-Pin versorgt das Board also über Diode und Regler; der Pin zeigt dann die Akkuspannung.
+Das Board hat **keinen Lader**, Laden erfolgt extern. **USB und Akku niemals gleichzeitig anschließen**
+(VBUS und Akku sind am Pin verbunden). Dafür einen Schalter/Jumper in die Akkuleitung setzen.
+Die **rote Power-LED** (an VSYS) zieht dauerhaft Strom und sollte entfernt werden. Der ME6211 braucht selbst
+rund 50 µA.
 
 ## Betriebsmodi
 | Modus | Verhalten |

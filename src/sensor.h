@@ -24,7 +24,15 @@ static uint16_t readMv(int pin) {
   return sum / 16;
 }
 
-static bool usbPresent() { return readMv(PIN_SUPPLY_ADC) * 2 > USB_MIN_MV; }
+// Two equal resistors form the divider (any value, e.g. 100k..1M): factor 2.
+// The per-mille correction compensates resistor tolerance and ADC offset.
+static uint16_t rawSupplyMv() { return readMv(PIN_SUPPLY_ADC) * 2; }
+
+static uint16_t supplyMv(const Settings &cfg) {
+  return (uint32_t)rawSupplyMv() * cfg.supplyCalPm / 1000;
+}
+
+static bool usbPresent(const Settings &cfg) { return supplyMv(cfg) > USB_MIN_MV; }
 
 static Reading measure(const Settings &cfg) {
   Reading r{};
@@ -41,7 +49,7 @@ static Reading measure(const Settings &cfg) {
   long pct = span != 0 ? ((long)cfg.rawDry - r.rawMv) * 100 / span : 0;
   r.moisture = constrain(pct, 0, 100);
 
-  r.supplyMv = readMv(PIN_SUPPLY_ADC) * 2;  // 1:1 divider
+  r.supplyMv = supplyMv(cfg);
   r.usb = r.supplyMv > USB_MIN_MV;
   r.wateredAgoH = -1;
   return r;

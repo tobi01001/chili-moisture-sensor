@@ -17,6 +17,7 @@ struct Settings {
   uint8_t wateredJumpPct = 15;   // a rise by this much counts as "watered"
   uint16_t rawDry = 3000;        // sensor mV in dry air
   uint16_t rawWet = 1300;        // sensor mV in water
+  uint16_t supplyCalPm = 1000;   // supply voltage correction in per mille (1000 = 1.000)
 
   bool valid() const { return ssid.length() && fhemHost.length(); }
 
@@ -37,6 +38,7 @@ struct Settings {
     wateredJumpPct = p.getUChar("jump", wateredJumpPct);
     rawDry = p.getUShort("dry", rawDry);
     rawWet = p.getUShort("wet", rawWet);
+    supplyCalPm = p.getUShort("scal", supplyCalPm);
     p.end();
   }
 
@@ -57,6 +59,7 @@ struct Settings {
     p.putUChar("jump", wateredJumpPct);
     p.putUShort("dry", rawDry);
     p.putUShort("wet", rawWet);
+    p.putUShort("scal", supplyCalPm);
     p.end();
   }
 };

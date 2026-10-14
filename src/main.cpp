@@ -59,7 +59,7 @@ void setup() {
   bool buttonWake = cause == ESP_SLEEP_WAKEUP_GPIO ||
                     (cause == ESP_SLEEP_WAKEUP_UNDEFINED && digitalRead(PIN_BUTTON) == LOW);
 
-  usbMode = usbPresent();
+  usbMode = usbPresent(cfg);
 
   if (buttonWake || !cfg.valid()) {
     startNetwork(cfg, true);

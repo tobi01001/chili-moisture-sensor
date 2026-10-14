@@ -13,7 +13,8 @@ meldet sie bei Bedarf an FHEM und liefert eine Gießempfehlung („Gießen: ja/n
 | H2 | Sensor: kapazitiver Bodenfeuchtesensor v2.0 / HW-390 (TLC555, Regler), analog an ADC1-Pin. |
 | H3 | Sensor-Versorgung über GPIO schaltbar, nur während der Messung aktiv. |
 | H4 | Versorgung 1S-LiPo (3,0–4,2 V) am 5V-Pin; Laden extern. |
-| H5 | Spannungsteiler 100k/100k vom 5V-Pin auf einen ADC-Pin: erkennt USB und misst die Akkuspannung. |
+| H5 | Zwei gleiche Teilerwiderstände (frei wählbar, 100 kΩ–1 MΩ) vom 5V-Pin auf einen ADC-Pin: erkennt USB und misst die Akkuspannung. Kalibrierfaktor über die Weboberfläche (Eingabe der real gemessenen Spannung). |
+| H7 | USB und Akku nie gleichzeitig am 5V-Pin (VBUS und 5V-Pin sind verbunden); Trennschalter/Jumper in der Akkuleitung. Power-LED entfernen. |
 | H6 | Taster nach GND an einem RTC-fähigen GPIO (0–5); weckt aus dem Deep Sleep. |
 
 ## 3. Funktionale Anforderungen
@@ -32,6 +33,7 @@ meldet sie bei Bedarf an FHEM und liefert eine Gießempfehlung („Gießen: ja/n
 | F11 | Portal im Akkubetrieb endet nach „Speichern“, „Neustart“ oder 5 min; dann Messmodus. |
 | F12 | Einstellbar: WLAN, FHEM-Host/Port/Device, Messintervall, Wiederholintervall, Heartbeat, Änderungsschwelle, Gießschwelle, Hysterese, Gegossen-Sprung, Kalibrierung (inkl. Klick-Kalibrierung mit Live-Anzeige). |
 | F13 | Einstellungen im NVS; Zustand (letzter Wert, Zähler) im RTC-Speicher. |
+| F15 | Kalibrierung der Versorgungsspannung: Eingabe der gemessenen Spannung ergibt einen Korrekturfaktor (0,5–1,5). |
 | F14 | USB-Betrieb: kein Deep Sleep, Messung im Intervall in der Hauptschleife. |
 
 ## 4. Nichtfunktionale Anforderungen

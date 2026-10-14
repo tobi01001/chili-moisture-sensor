@@ -32,6 +32,9 @@ static void addRoutes(Settings &cfg) {
                " mV (" + (r.usb ? "USB" : "Akku") + ")</p>"
                "<p><a href='/cal?p=dry'>Aktuellen Wert als TROCKEN speichern</a><br>"
                "<a href='/cal?p=wet'>Aktuellen Wert als NASS speichern</a></p>"
+               "<form action=/calsupply><label>Versorgung mit Multimeter gemessen (mV)<br>"
+               "<input name=mv type=number></label> <button>Kalibrieren</button>"
+               " (Faktor " + String(cfg.supplyCalPm / 1000.0, 3) + ")</form>"
                "<form method=post action=/save>";
     h += field("WLAN SSID", "ssid", cfg.ssid, "text");
     h += field("WLAN Passwort", "pass", cfg.pass, "password");
@@ -56,6 +59,17 @@ static void addRoutes(Settings &cfg) {
     uint16_t mv = measure(cfg).rawMv;
     if (server.arg("p") == "dry") cfg.rawDry = mv; else cfg.rawWet = mv;
     cfg.save();
+    server.sendHeader("Location", "/");
+    server.send(303);
+  });
+
+  server.on("/calsupply", [&] {
+    long real = server.arg("mv").toInt();
+    uint16_t raw = rawSupplyMv();
+    if (real > 0 && raw > 0) {
+      cfg.supplyCalPm = constrain(real * 1000 / raw, 500, 1500);
+      cfg.save();
+    }
     server.sendHeader("Location", "/");
     server.send(303);
   });

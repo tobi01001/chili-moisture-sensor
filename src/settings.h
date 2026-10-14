@@ -6,8 +6,7 @@
 struct Settings {
   String ssid, pass;
   String fhemHost;
-  uint16_t fhemPort = 8083;
-  String fhemDevice = "chili1";  // dummy device in FHEM that receives the readings
+  uint16_t fhemPort = 7072;      // FHEM telnet port (no HTTP needed)
   uint16_t intervalMin = 60;     // measurement interval
   uint16_t retryMin = 5;         // interval after a failed transmission
   uint16_t heartbeatMin = 360;   // send at least this often (FHEM sees the sensor is alive)
@@ -28,7 +27,6 @@ struct Settings {
     pass = p.getString("pass");
     fhemHost = p.getString("host");
     fhemPort = p.getUShort("port", fhemPort);
-    fhemDevice = p.getString("dev", fhemDevice);
     intervalMin = p.getUShort("int", intervalMin);
     retryMin = p.getUShort("retry", retryMin);
     heartbeatMin = p.getUShort("hb", heartbeatMin);
@@ -49,7 +47,6 @@ struct Settings {
     p.putString("pass", pass);
     p.putString("host", fhemHost);
     p.putUShort("port", fhemPort);
-    p.putString("dev", fhemDevice);
     p.putUShort("int", intervalMin);
     p.putUShort("retry", retryMin);
     p.putUShort("hb", heartbeatMin);

@@ -45,7 +45,7 @@ rund 50 µA.
 Ohne gespeicherte Konfiguration startet automatisch das Portal.
 
 ## Einstellungen (Weboberfläche)
-WLAN · FHEM-Host/Port/Device · Messintervall (60 min) · Wiederholung bei Fehler (5 min) ·
+WLAN · FHEM-Host/Telnet-Port · Messintervall (60 min) · Wiederholung bei Fehler (5 min) ·
 Heartbeat (360 min) · Senden ab Änderung (5 %) · Gießen unter (35 %) · Hysterese (10 %, `water`
 fällt erst ab 45 % zurück) · Gegossen-Erkennung bei Anstieg um (15 %) · Kalibrierung trocken/nass.
 
@@ -59,15 +59,13 @@ pio device monitor
 ```
 
 ## FHEM
+Push per Telnet wie beim Temperatursensor. Der Gerätename `Chili_<crc16 der MAC>` wird automatisch gebildet,
+FHEM legt das Device beim ersten Kontakt selbst an (Funktion `handleChiliSensor` in
+[fhem/99_myUtils_chili.pm](fhem/99_myUtils_chili.pm)).
 ```
-define chili1 dummy
-attr WEB csrfToken none
+define telnetSensors telnet 7072
 ```
-Der Device-Name ist in der Weboberfläche einstellbar, das Device muss in FHEM existieren.
-Readings: `moisture` (%), `raw_mv`, `supply_mv`, `usb`, `water` (1 = gießen), `watered_ago_h`.
-```
-define n_chili1 notify chili1:water:.1 { Log 1, "Chili 1 gießen!" }
-```
+Einrichtung, Readings, Beispiele und Sicherheitshinweise: **[docs/FHEM.md](docs/FHEM.md)**.
 
 ## Status
 Kompiliert, noch nicht auf Hardware getestet (Kalibrier-Defaults: trocken 3000 mV, nass 1300 mV).

@@ -29,6 +29,7 @@ static bool evaluate(const Settings &c, Reading &r, uint32_t elapsedMin) {
   else if (st.water && r.moisture >= c.waterBelowPct + c.hystPct) st.water = false;
 
   r.needsWater = st.water;
+  r.first = !st.init;
   r.wateredAgoH = st.watered ? st.minSinceWatered / 60 : -1;
 
   return !st.init || watered || st.water != prevWater ||

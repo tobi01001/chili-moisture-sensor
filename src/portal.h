@@ -27,7 +27,8 @@ static void addRoutes(Settings &cfg) {
     Reading r = measure(cfg);
     String h = "<!doctype html><meta name=viewport content='width=device-width'>"
                "<style>body{font-family:sans-serif;margin:1em}input{width:95%}</style>"
-               "<h2>Chili Sensor</h2><p>Live: <b>" + String(r.rawMv) + " mV</b> = " +
+               "<h2>Chili Sensor</h2><p>FHEM-Device: <b>" + deviceName() + "</b></p>"
+               "<p>Live: <b>" + String(r.rawMv) + " mV</b> = " +
                String(r.moisture) + " % &middot; Versorgung " + String(r.supplyMv) +
                " mV (" + (r.usb ? "USB" : "Akku") + ")</p>"
                "<p><a href='/cal?p=dry'>Aktuellen Wert als TROCKEN speichern</a><br>"
@@ -39,8 +40,7 @@ static void addRoutes(Settings &cfg) {
     h += field("WLAN SSID", "ssid", cfg.ssid, "text");
     h += field("WLAN Passwort", "pass", cfg.pass, "password");
     h += field("FHEM Host", "host", cfg.fhemHost, "text");
-    h += field("FHEM Port (FHEMWEB)", "port", String(cfg.fhemPort));
-    h += field("FHEM Device (dummy)", "dev", cfg.fhemDevice, "text");
+    h += field("FHEM Telnet-Port", "port", String(cfg.fhemPort));
     h += field("Messintervall (min)", "int", String(cfg.intervalMin));
     h += field("Wiederholung bei Fehler (min)", "retry", String(cfg.retryMin));
     h += field("Heartbeat: spätestens senden alle (min)", "hb", String(cfg.heartbeatMin));
@@ -79,7 +79,6 @@ static void addRoutes(Settings &cfg) {
     cfg.pass = server.arg("pass");
     cfg.fhemHost = server.arg("host");
     cfg.fhemPort = server.arg("port").toInt();
-    cfg.fhemDevice = server.arg("dev");
     cfg.intervalMin = max(1L, server.arg("int").toInt());
     cfg.retryMin = max(1L, server.arg("retry").toInt());
     cfg.heartbeatMin = max(1L, server.arg("hb").toInt());

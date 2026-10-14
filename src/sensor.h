@@ -11,6 +11,7 @@ struct Reading {
   uint16_t supplyMv;   // voltage at the 5V pin (= battery voltage when not on USB)
   bool usb;
   bool needsWater;     // filled in by evaluate()
+  bool first;          // first transmission since power-on: also send static info
   int32_t wateredAgoH; // -1 = unknown
 };
 

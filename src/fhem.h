@@ -10,8 +10,10 @@ static bool sendToFhem(const Settings &cfg, const Reading &r) {
   String d = cfg.fhemDevice;
   String cmd = "setreading " + d + " moisture " + r.moisture;
   cmd += ";setreading " + d + " raw_mv " + r.rawMv;
-  cmd += ";setreading " + d + " battery_mv " + r.batteryMv;
+  cmd += ";setreading " + d + " supply_mv " + r.supplyMv;
+  cmd += ";setreading " + d + " usb " + (r.usb ? "1" : "0");
   cmd += ";setreading " + d + " water " + (r.needsWater ? "1" : "0");
+  if (r.wateredAgoH >= 0) cmd += ";setreading " + d + " watered_ago_h " + r.wateredAgoH;
 
   String url = "http://" + cfg.fhemHost + ":" + cfg.fhemPort + "/fhem?XHR=1&cmd=";
   for (char c : cmd) {

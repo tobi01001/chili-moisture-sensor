@@ -1,54 +1,53 @@
 # Anforderungsspezifikation – Chili-Feuchtesensor
 
-Version 0.1 · Status: Entwurf
+Version 0.2 · Status: Entwurf
 
 ## 1. Zweck
 Batteriebetriebener Bodenfeuchtesensor für Chilipflanzen. Er misst periodisch die Bodenfeuchte,
-meldet sie an FHEM und liefert eine Gießempfehlung („Gießen: ja/nein“).
+meldet sie bei Bedarf an FHEM und liefert eine Gießempfehlung („Gießen: ja/nein“).
 
-## 2. Hardware (Randbedingungen)
+## 2. Hardware
 | ID | Anforderung |
 |----|-------------|
-| H1 | Mikrocontroller: ESP32-C3 SuperMini (Deep-Sleep-fähig). |
-| H2 | Sensor: kapazitiver Bodenfeuchtesensor (analog, v2.0 / HW-390 mit TLC555 und Spannungsregler), an ADC1-Pin. |
+| H1 | ESP32-C3 SuperMini (GPIO0–10, 20, 21 herausgeführt, kein Lader). |
+| H2 | Sensor: kapazitiver Bodenfeuchtesensor v2.0 / HW-390 (TLC555, Regler), analog an ADC1-Pin. |
 | H3 | Sensor-Versorgung über GPIO schaltbar, nur während der Messung aktiv. |
-| H4 | Versorgung: 1S-LiPo/Li-Ion (3,0–4,2 V); das SuperMini hat keinen Lader, Laden extern. Optional Spannungsteiler 2×100 kΩ zur Akkumessung. |
-| H5 | Ein Pin (Taster/Jumper nach GND) startet den Konfigurationsmodus. |
+| H4 | Versorgung 1S-LiPo (3,0–4,2 V) am 5V-Pin; Laden extern. |
+| H5 | Spannungsteiler 100k/100k vom 5V-Pin auf einen ADC-Pin: erkennt USB und misst die Akkuspannung. |
+| H6 | Taster nach GND an einem RTC-fähigen GPIO (0–5); weckt aus dem Deep Sleep. |
 
 ## 3. Funktionale Anforderungen
 | ID | Anforderung |
 |----|-------------|
-| F1 | Das Gerät wacht per Timer auf, misst, sendet, geht in Deep Sleep. Kein Dauerbetrieb. |
-| F2 | Die Messung mittelt mehrere ADC-Samples (Rauschunterdrückung). |
-| F3 | Der Rohwert (mV) wird anhand zweier Kalibrierpunkte (trocken/nass) in 0–100 % umgerechnet. |
-| F4 | Gießempfehlung: Feuchte < einstellbarer Schwelle ⇒ `water = 1`, sonst `0`. |
-| F5 | Der Akkustand (mV) wird mitgesendet, sofern H4 verbaut ist. |
-| F6 | Übertragung per Push an FHEM (kein Polling, da Deep Sleep): HTTP-Request an FHEMWEB, der Readings eines Dummy-Devices setzt (`moisture`, `raw_mv`, `battery_mv`, `water`). |
-| F7 | Bei Übertragungsfehler (WLAN/FHEM) erneuter Versuch nach kürzerem, einstellbarem Intervall. |
-| F8 | Konfiguration ohne Neuflashen über lokalen Webserver (Access Point `ChiliSensor-Setup`, 192.168.4.1). |
-| F9 | Einstellbar: WLAN, FHEM-Host/Port/Device, Intervall, Wiederholintervall, Gießschwelle, Kalibrierung. |
-| F10 | Kalibrierung per Klick: „aktueller Wert = trocken/nass“ inkl. Live-Anzeige. |
-| F11 | Konfigurationsmodus startet bei fehlender Konfiguration oder gedrücktem Config-Pin beim Reset und endet nach Speichern oder 5 min Timeout. |
-| F12 | Einstellungen liegen im NVS und überstehen Deep Sleep, Reset und Akkuwechsel. |
+| F1 | Akkubetrieb: Timer-Wakeup, messen, ggf. senden, Deep Sleep. Kein Webserver. |
+| F2 | Messung mittelt mehrere ADC-Samples. |
+| F3 | Umrechnung in 0–100 % über zwei Kalibrierpunkte (trocken/nass). |
+| F4 | Gießempfehlung `water` mit Schwelle (Standard 35 %) und Hysterese (Standard 10 %): Setzen unter Schwelle, Zurücksetzen ab Schwelle + Hysterese. |
+| F5 | Gegossen-Erkennung: Feuchteanstieg ≥ einstellbarer Wert (Standard 15 %) zwischen zwei Messungen; Reading `watered_ago_h`. |
+| F6 | Senden nur bei: erstem Start, Feuchteänderung ≥ Schwelle (Standard 5 %) seit letztem Senden, Wechsel von `water`, erkanntem Gießen oder Heartbeat. Ohne Sendegrund bleibt das WLAN aus. |
+| F7 | Heartbeat einstellbar (Standard 360 min). |
+| F8 | Push per HTTP an FHEMWEB (`setreading` auf Dummy-Device, Name einstellbar): `moisture`, `raw_mv`, `supply_mv`, `usb`, `water`, `watered_ago_h`. |
+| F9 | Bei Übertragungsfehler Wiederholung nach einstellbarem, kürzerem Intervall. |
+| F10 | Konfigurations-Webserver: Aktivierung durch Taster-Wakeup (Akku/USB) oder dauerhaft bei USB. Erreichbar über WLAN-IP und/oder AP `ChiliSensor-Setup` (192.168.4.1). |
+| F11 | Portal im Akkubetrieb endet nach „Speichern“, „Neustart“ oder 5 min; dann Messmodus. |
+| F12 | Einstellbar: WLAN, FHEM-Host/Port/Device, Messintervall, Wiederholintervall, Heartbeat, Änderungsschwelle, Gießschwelle, Hysterese, Gegossen-Sprung, Kalibrierung (inkl. Klick-Kalibrierung mit Live-Anzeige). |
+| F13 | Einstellungen im NVS; Zustand (letzter Wert, Zähler) im RTC-Speicher. |
+| F14 | USB-Betrieb: kein Deep Sleep, Messung im Intervall in der Hauptschleife. |
 
 ## 4. Nichtfunktionale Anforderungen
 | ID | Anforderung |
 |----|-------------|
-| N1 | Energie: Aktive Zeit pro Zyklus möglichst < 5 s; Ziel: Monate Laufzeit bei 60-min-Intervall mit 1000–2000 mAh. |
-| N2 | Schlanker, gut lesbarer Code; keine unnötigen Abhängigkeiten (nur Arduino-ESP32-Core). |
-| N3 | Aufbau mit PlatformIO; Pins per Build-Flag änderbar. |
+| N1 | Aktive Zeit pro Zyklus ohne Senden < 1 s; mit Senden < 5 s. Ziel: Monate Laufzeit mit 1000–2000 mAh. |
+| N2 | Schlanker, gut lesbarer Code; nur Arduino-ESP32-Core. |
+| N3 | PlatformIO; Pins per Build-Flag änderbar. |
 | N4 | Lizenz: MIT. |
 
 ## 5. Schnittstelle FHEM
-- Transport: `GET http://<host>:<port>/fhem?XHR=1&cmd=setreading <dev> <reading> <wert>;…`
-- Voraussetzung in FHEM: `define chili1 dummy` und FHEMWEB ohne CSRF-Token für das Gerät
-  (`attr WEB csrfToken none` oder `allowed`-Konzept).
-- Readings: `moisture` (%), `raw_mv`, `battery_mv`, `water` (0/1).
+- `GET http://<host>:<port>/fhem?XHR=1&cmd=setreading <dev> <reading> <wert>;…`
+- Voraussetzung: `define <dev> dummy`, FHEMWEB ohne CSRF-Token (`attr WEB csrfToken none`).
 
 ## 6. Offen / spätere Erweiterungen
-- OTA-Update (wie im ESP32-temperature-sensor-Projekt).
-- Alternative Transporte: MQTT, Telnet-Push.
-- Mehrere Sensoren pro Gerät (ADC1 hat im C3 nur 5 Kanäle).
-- Kurzes Konfigurationsfenster nach Senden (Remote-Parametrierung ohne Taster).
-- Akku-Warnschwelle als eigenes Reading.
-- Glättung/Trend (z. B. „trocknet in ~2 Tagen aus“).
+- OTA-Update, MQTT-Alternative.
+- Akku-Warnschwelle, Trendberechnung („trocken in ~2 Tagen“).
+- Kompensation des Diodenabfalls bei Schottky in der Akkuleitung.
+- Mehrere Sensoren.

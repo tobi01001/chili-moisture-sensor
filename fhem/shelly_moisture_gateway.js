@@ -1,7 +1,7 @@
-// Shelly Gen2+ script (e.g. Plus Plug S): BLE gateway chili sensor (BTHome v2) -> FHEM.
+// Shelly Gen2+ script (e.g. Plus Plug S): BLE gateway moisture sensor (BTHome v2) -> FHEM.
 // Settings: Bluetooth enabled, script set to "run on startup".
-// FHEM side: define WEBchili FHEMWEB 8084 global ; attr WEBchili csrfToken none (LAN only!)
-var FHEM = "http://192.168.1.10:8084/fhem";  // adjust
+// FHEM side: define WEBmoisture FHEMWEB 8084 global ; attr WEBmoisture csrfToken none (LAN only!)
+var FHEM = "http://192.168.2.18:8087/fhem";  // adjust
 var last = {};  // name -> last packet id (the sensor repeats each packet)
 
 function enc(s) {
@@ -24,15 +24,19 @@ function parse(d, name) {  // d: BTHome payload after UUID, starting at device i
     else if (id === 0x0F) { r.water = d.charCodeAt(i + 1); i += 2; }
     else if (id === 0x10) { r.usb = d.charCodeAt(i + 1); i += 2; }
     else if (id === 0x2F) { r.moist = d.charCodeAt(i + 1); i += 2; }
+    else if (id === 0x3D) { r.raw = d.charCodeAt(i + 1) + 256 * d.charCodeAt(i + 2); i += 3; }
     else break;
   }
   return r;
 }
 
 BLE.Scanner.Subscribe(function (ev, res) {
+  // The sensor advertises only the CRC as local name (the prefix is implied).
   if (ev !== BLE.Scanner.SCAN_RESULT || !res.local_name) return;
-  var name = res.local_name;
-  if (name.indexOf("Chili_") !== 0) return;
+  var crc = res.local_name;
+  if (crc.length < 1 || crc.length > 5) return;
+  for (var k = 0; k < crc.length; k++) if ("0123456789".indexOf(crc.charAt(k)) < 0) return;
+  var device = "Moisture_" + crc;
   var ad = res.advData, i = 0, d = null;
   while (i + 1 < ad.length) {
     var len = ad.charCodeAt(i);
@@ -43,10 +47,10 @@ BLE.Scanner.Subscribe(function (ev, res) {
   }
   if (d === null) return;
   var r = parse(d);
-  if (r.moist === undefined || last[name] === r.pid) return;
-  last[name] = r.pid;
-  var p = "moisture " + r.moist + ": supply_mv " + r.mv + ": usb " + r.usb + ": water " + r.water;
-  var cmd = '{handleChiliSensor("' + name + '", "' + p + '")}';
+  if (r.moist === undefined || last[device] === r.pid) return;
+  last[device] = r.pid;
+  var p = "moi " + r.moist + ": raw " + r.raw + ": sup " + r.mv + ": usb " + r.usb + ": wtr " + r.water;
+  var cmd = '{handleMoistureSensor("' + device + '", "' + p + '")}';
   Shelly.call("HTTP.GET", { url: FHEM + "?XHR=1&cmd=" + enc(cmd), timeout: 5 }, function (x, ec) {
     if (ec) print("FHEM error", ec);
   });

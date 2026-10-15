@@ -1,9 +1,9 @@
-# Anforderungsspezifikation – Chili-Feuchtesensor
+# Anforderungsspezifikation – Bodenfeuchtesensor
 
-Version 0.3 · Status: Entwurf
+Version 0.4 · Status: Entwurf
 
 ## 1. Zweck
-Batteriebetriebener Bodenfeuchtesensor für Chilipflanzen. Er misst periodisch die Bodenfeuchte,
+Batteriebetriebener Bodenfeuchtesensor für Zimmer- und Nutzpflanzen (z. B. Chili). Er misst periodisch die Bodenfeuchte,
 meldet sie bei Bedarf an FHEM und liefert eine Gießempfehlung („Gießen: ja/nein“).
 
 ## 2. Hardware
@@ -27,15 +27,15 @@ meldet sie bei Bedarf an FHEM und liefert eine Gießempfehlung („Gießen: ja/n
 | F5 | Gegossen-Erkennung: Feuchteanstieg ≥ einstellbarer Wert (Standard 15 %) zwischen zwei Messungen; Reading `watered_ago_h`. |
 | F6 | Senden nur bei: erstem Start, Feuchteänderung ≥ Schwelle (Standard 5 %) seit letztem Senden, Wechsel von `water`, erkanntem Gießen oder Heartbeat. Ohne Sendegrund bleibt das WLAN aus. |
 | F7 | Heartbeat einstellbar (Standard 360 min). |
-| F8 | Push per Telnet an FHEM (Perl-Aufruf `handleChiliSensor`); Gerätename `Chili_<crc16 der MAC>`, Auto-Anlage in FHEM: `moisture`, `raw_mv`, `supply_mv`, `usb`, `water`, `watered_ago_h` (+ einmalig Geräteinfo). |
+| F8 | Push per Telnet an FHEM (Perl-Aufruf `handleMoistureSensor`); Gerätename `Moisture_<crc16 der MAC>`, Kurze 3-Buchstaben-Schlüssel (gleich für WLAN und BLE), von der FHEM-Funktion zu Readings expandiert. Auto-Anlage in FHEM: `moisture`, `raw_mv`, `supply_mv`, `usb`, `water`, `watered_ago_h` (+ einmalig Geräteinfo). |
 | F9 | Bei Übertragungsfehler Wiederholung nach einstellbarem, kürzerem Intervall. |
-| F10 | Konfigurations-Webserver: Aktivierung durch Taster-Wakeup (Akku/USB) oder dauerhaft bei USB. Erreichbar über WLAN-IP und/oder AP `ChiliSensor-Setup` (192.168.4.1). |
+| F10 | Konfigurations-Webserver: Aktivierung durch Taster-Wakeup (Akku/USB) oder dauerhaft bei USB. Erreichbar über WLAN-IP und/oder AP `MoistureSensor-Setup` (192.168.4.1). |
 | F11 | Portal im Akkubetrieb endet nach „Speichern“, „Neustart“ oder 5 min; dann Messmodus. |
 | F12 | Einstellbar: WLAN, FHEM-Host/Telnet-Port, Messintervall, Wiederholintervall, Heartbeat, Änderungsschwelle, Gießschwelle, Hysterese, Gegossen-Sprung, Kalibrierung (inkl. Klick-Kalibrierung mit Live-Anzeige). |
 | F13 | Einstellungen im NVS; Zustand (letzter Wert, Zähler) im RTC-Speicher. |
 | F15 | Kalibrierung der Versorgungsspannung: Eingabe der gemessenen Spannung ergibt einen Korrekturfaktor (0,5–1,5). |
 | F16 | Übertragungsweg wählbar (Portal): WLAN→FHEM (Standard), Bluetooth oder beides (nur zum Testen). Batteriebetrieb-/USB-Erkennung bleibt unabhängig davon. Bei „nur Bluetooth“ bleibt das WLAN im Messmodus aus. |
-| F17 | Bluetooth: nicht verbindbares BTHome-v2-Advertising (Feuchte, Akku %, Spannung, `water`, USB) mit Name `Chili_<crc>`, ca. 1,5 s je Meldung. Empfang über Shelly-Gateway-Skript (`fhem/shelly_chili_gateway.js`, getestet vorgesehen für Shelly Plus Plug S), das per HTTP an FHEM weiterleitet. Kein Rückkanal. |
+| F17 | Bluetooth: nicht verbindbares BTHome-v2-Advertising (Feuchte, Akku %, Spannung, `water`, USB) ohne Gerätenamen-Prefix: lokaler Name nur `<crc>` (31-Byte-Limit; das Gateway-Skript bildet `Moisture_<crc>`), zusätzlich Rohwert, ca. 1,5 s je Meldung. Empfang über Shelly-Gateway-Skript (`fhem/shelly_moisture_gateway.js`, getestet vorgesehen für Shelly Plus Plug S), das per HTTP an FHEM weiterleitet. Kein Rückkanal. |
 | F14 | USB-Betrieb: kein Deep Sleep, Messung im Intervall in der Hauptschleife. |
 
 ## 4. Nichtfunktionale Anforderungen
@@ -47,8 +47,8 @@ meldet sie bei Bedarf an FHEM und liefert eine Gießempfehlung („Gießen: ja/n
 | N4 | Lizenz: MIT. |
 
 ## 5. Schnittstelle FHEM
-- TCP auf FHEM-Telnet-Port (Standard 7072): `{handleChiliSensor("Chili_<crc>", "moisture 42: raw_mv 2100: …")}` + `exit`.
-- Voraussetzung: `define telnetSensors telnet 7072`, `fhem/99_myUtils_chili.pm` geladen. Details: docs/FHEM.md.
+- TCP auf FHEM-Telnet-Port (Standard 7072): `{handleMoistureSensor("Moisture_<crc>", "moi 42: raw 2100: …")}` + `exit`.
+- Voraussetzung: `define telnetSensors telnet 7072`, `fhem/99_myUtils_moisture.pm` geladen. Details: docs/FHEM.md.
 
 ## 5a. Schnittstelle Bluetooth
 BTHome v2, siehe docs/FHEM.md.

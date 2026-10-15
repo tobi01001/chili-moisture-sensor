@@ -27,7 +27,7 @@ struct Settings {
 
   void load() {
     Preferences p;
-    p.begin("chili", true);
+    p.begin("moisture", true);
     transport = min<uint8_t>(p.getUChar("tr", transport), TR_BOTH);
     ssid = p.getString("ssid");
     pass = p.getString("pass");
@@ -48,7 +48,7 @@ struct Settings {
 
   void save() const {
     Preferences p;
-    p.begin("chili", false);
+    p.begin("moisture", false);
     p.putUChar("tr", transport);
     p.putString("ssid", ssid);
     p.putString("pass", pass);

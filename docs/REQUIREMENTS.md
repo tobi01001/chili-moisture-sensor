@@ -1,6 +1,6 @@
 # Anforderungsspezifikation – Chili-Feuchtesensor
 
-Version 0.2 · Status: Entwurf
+Version 0.3 · Status: Entwurf
 
 ## 1. Zweck
 Batteriebetriebener Bodenfeuchtesensor für Chilipflanzen. Er misst periodisch die Bodenfeuchte,
@@ -34,6 +34,8 @@ meldet sie bei Bedarf an FHEM und liefert eine Gießempfehlung („Gießen: ja/n
 | F12 | Einstellbar: WLAN, FHEM-Host/Telnet-Port, Messintervall, Wiederholintervall, Heartbeat, Änderungsschwelle, Gießschwelle, Hysterese, Gegossen-Sprung, Kalibrierung (inkl. Klick-Kalibrierung mit Live-Anzeige). |
 | F13 | Einstellungen im NVS; Zustand (letzter Wert, Zähler) im RTC-Speicher. |
 | F15 | Kalibrierung der Versorgungsspannung: Eingabe der gemessenen Spannung ergibt einen Korrekturfaktor (0,5–1,5). |
+| F16 | Übertragungsweg wählbar (Portal): WLAN→FHEM (Standard), Bluetooth oder beides (nur zum Testen). Batteriebetrieb-/USB-Erkennung bleibt unabhängig davon. Bei „nur Bluetooth“ bleibt das WLAN im Messmodus aus. |
+| F17 | Bluetooth: nicht verbindbares BTHome-v2-Advertising (Feuchte, Akku %, Spannung, `water`, USB) mit Name `Chili_<crc>`, ca. 1,5 s je Meldung. Empfang über Shelly-Gateway-Skript (`fhem/shelly_chili_gateway.js`, getestet vorgesehen für Shelly Plus Plug S), das per HTTP an FHEM weiterleitet. Kein Rückkanal. |
 | F14 | USB-Betrieb: kein Deep Sleep, Messung im Intervall in der Hauptschleife. |
 
 ## 4. Nichtfunktionale Anforderungen
@@ -47,6 +49,9 @@ meldet sie bei Bedarf an FHEM und liefert eine Gießempfehlung („Gießen: ja/n
 ## 5. Schnittstelle FHEM
 - TCP auf FHEM-Telnet-Port (Standard 7072): `{handleChiliSensor("Chili_<crc>", "moisture 42: raw_mv 2100: …")}` + `exit`.
 - Voraussetzung: `define telnetSensors telnet 7072`, `fhem/99_myUtils_chili.pm` geladen. Details: docs/FHEM.md.
+
+## 5a. Schnittstelle Bluetooth
+BTHome v2, siehe docs/FHEM.md.
 
 ## 6. Offen / spätere Erweiterungen
 - OTA-Update, MQTT-Alternative.

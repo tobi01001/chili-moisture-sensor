@@ -3,7 +3,10 @@
 #include <Preferences.h>
 
 // All user-adjustable parameters, persisted in NVS (survives deep sleep and reflash).
+enum Transport : uint8_t { TR_WIFI = 0, TR_BLE = 1, TR_BOTH = 2 };
+
 struct Settings {
+  uint8_t transport = TR_WIFI;   // WLAN->FHEM, BLE (BTHome via Shelly gateway) or both
   String ssid, pass;
   String fhemHost;
   uint16_t fhemPort = 7072;      // FHEM telnet port (no HTTP needed)
@@ -18,11 +21,14 @@ struct Settings {
   uint16_t rawWet = 1300;        // sensor mV in water
   uint16_t supplyCalPm = 1000;   // supply voltage correction in per mille (1000 = 1.000)
 
-  bool valid() const { return ssid.length() && fhemHost.length(); }
+  bool useWifi() const { return transport != TR_BLE; }
+  bool useBle() const { return transport != TR_WIFI; }
+  bool valid() const { return !useWifi() || (ssid.length() && fhemHost.length()); }
 
   void load() {
     Preferences p;
     p.begin("chili", true);
+    transport = min<uint8_t>(p.getUChar("tr", transport), TR_BOTH);
     ssid = p.getString("ssid");
     pass = p.getString("pass");
     fhemHost = p.getString("host");
@@ -43,6 +49,7 @@ struct Settings {
   void save() const {
     Preferences p;
     p.begin("chili", false);
+    p.putUChar("tr", transport);
     p.putString("ssid", ssid);
     p.putString("pass", pass);
     p.putString("host", fhemHost);

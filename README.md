@@ -45,7 +45,7 @@ rund 50 µA.
 Ohne gespeicherte Konfiguration startet automatisch das Portal.
 
 ## Einstellungen (Weboberfläche)
-WLAN · FHEM-Host/Telnet-Port · Messintervall (60 min) · Wiederholung bei Fehler (5 min) ·
+Übertragung (WLAN, Bluetooth oder beides) · WLAN · FHEM-Host/Telnet-Port · Messintervall (60 min) · Wiederholung bei Fehler (5 min) ·
 Heartbeat (360 min) · Senden ab Änderung (5 %) · Gießen unter (35 %) · Hysterese (10 %, `water`
 fällt erst ab 45 % zurück) · Gegossen-Erkennung bei Anstieg um (15 %) · Kalibrierung trocken/nass.
 
@@ -66,6 +66,8 @@ FHEM legt das Device beim ersten Kontakt selbst an (Funktion `handleChiliSensor`
 define telnetSensors telnet 7072
 ```
 Einrichtung, Readings, Beispiele und Sicherheitshinweise: **[docs/FHEM.md](docs/FHEM.md)**.
+
+Alternativ ohne WLAN im Sensor: Bluetooth (BTHome) über ein Shelly-Gateway-Skript ([fhem/shelly_chili_gateway.js](fhem/shelly_chili_gateway.js)), siehe FHEM.md.
 
 ## Status
 Kompiliert, noch nicht auf Hardware getestet (Kalibrier-Defaults: trocken 3000 mV, nass 1300 mV).

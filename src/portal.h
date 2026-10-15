@@ -27,7 +27,7 @@ static void addRoutes(Settings &cfg) {
     Reading r = measure(cfg);
     String h = "<!doctype html><meta name=viewport content='width=device-width'>"
                "<style>body{font-family:sans-serif;margin:1em}input{width:95%}</style>"
-               "<h2>Chili Sensor</h2><p>FHEM-Device: <b>" + deviceName() + "</b></p>"
+               "<h2>Chili Sensor</h2><p>Gerät: <b>" + deviceName() + "</b></p>"
                "<p>Live: <b>" + String(r.rawMv) + " mV</b> = " +
                String(r.moisture) + " % &middot; Versorgung " + String(r.supplyMv) +
                " mV (" + (r.usb ? "USB" : "Akku") + ")</p>"
@@ -37,6 +37,11 @@ static void addRoutes(Settings &cfg) {
                "<input name=mv type=number></label> <button>Kalibrieren</button>"
                " (Faktor " + String(cfg.supplyCalPm / 1000.0, 3) + ")</form>"
                "<form method=post action=/save>";
+    h += "<p><label>Übertragung<br><select name=tr>";
+    const char *names[] = {"WLAN (FHEM Telnet)", "Bluetooth (BTHome, Shelly-Gateway)", "WLAN + Bluetooth (Test)"};
+    for (int i = 0; i < 3; i++)
+      h += String("<option value=") + i + (cfg.transport == i ? " selected" : "") + ">" + names[i] + "</option>";
+    h += "</select></label></p>";
     h += field("WLAN SSID", "ssid", cfg.ssid, "text");
     h += field("WLAN Passwort", "pass", cfg.pass, "password");
     h += field("FHEM Host", "host", cfg.fhemHost, "text");
@@ -75,6 +80,7 @@ static void addRoutes(Settings &cfg) {
   });
 
   server.on("/save", HTTP_POST, [&] {
+    cfg.transport = constrain(server.arg("tr").toInt(), 0, 2);
     cfg.ssid = server.arg("ssid");
     cfg.pass = server.arg("pass");
     cfg.fhemHost = server.arg("host");

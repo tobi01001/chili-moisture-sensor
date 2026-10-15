@@ -10,6 +10,7 @@
 #include "sensor.h"
 #include "logic.h"
 #include "fhem.h"
+#include "ble.h"
 #include "portal.h"
 
 static const uint32_t PORTAL_TIMEOUT_MS = 5UL * 60 * 1000;
@@ -42,8 +43,11 @@ static bool cycle(uint32_t elapsedMin) {
                 r.rawMv, r.moisture, r.supplyMv, r.usb, r.needsWater, send);
   if (!send) return true;
 
-  if (WiFi.status() != WL_CONNECTED && !connectWifi(cfg)) return false;
-  bool ok = sendToFhem(cfg, r);
+  if (cfg.useBle()) bleSend(r);  // fire and forget, no acknowledgement
+  bool ok = true;
+  if (cfg.useWifi()) {
+    ok = (WiFi.status() == WL_CONNECTED || connectWifi(cfg)) && sendToFhem(cfg, r);
+  }
   if (ok) markSent(r);
   return ok;
 }

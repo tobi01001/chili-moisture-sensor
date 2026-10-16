@@ -6,7 +6,6 @@
 //   DEBUG_FORCE_PORTAL treat every start like a button wake: config portal + measuring
 //   DEBUG_LED          onboard LED: heartbeat blink in loop(), flashes on transmission
 //   DEBUG_FORCE_SEND   always send data, regardless of evaluation
-#define DEBUG_ALL
 #ifdef DEBUG_ALL
   #ifndef DEBUG_LOG
     #define DEBUG_LOG

@@ -13,10 +13,36 @@ Sensor: Capacitive Soil Moisture Sensor v2.0 (HW-390). Das SuperMini führt GPIO
 |---|---|
 | Sensor VCC | GPIO3 (schaltbar) |
 | Sensor GND | GND |
-| Sensor AOUT | GPIO2 |
+| Sensor AOUT | GPIO4 |
 | Taster nach GND (weckt aus Deep Sleep) | GPIO0 |
 | Versorgungs-Teiler (siehe unten) | GPIO1 |
 
+```
+                         ┌─────────────────────────── 5V-Pin ──┐
+ Akku + ──[Schalter]─────┤                                     │ SuperMini
+ (oder USB, nie beides)  │                                     │
+                       [100k]                                  │
+                         ├────────────────────────── GPIO1 ────┤ (ADC: Versorgung)
+                       [100k]        [100nF]                   │
+                         │             │                       │
+ Akku − ─────────────────┴─────────────┴────────────── GND ────┤
+                                                               │
+ Sensor VCC ◄──────────────────────────────────────── GPIO3 ───┤ (schaltbar)
+ Sensor AOUT ─────────────────────────────────────────► GPIO4 ─┤ (ADC: Feuchte)
+ Sensor GND ───────────────────────────────────────────  GND ──┤
+ Taster ── GND ──────────────────────────────────────── GPIO0 ─┘ (weckt, Portal)
+```
+Zusammengefasst:
+
+| Verbindung | von | nach |
+|---|---|---|
+| Sensor-Versorgung | Sensor VCC | GPIO3 |
+| Sensor-Signal | Sensor AOUT | GPIO4 |
+| Masse | Sensor GND, Taster, Akku − | GND |
+| Taster | GPIO0 | GND (Pullup intern) |
+| Versorgungs-Teiler | 5V-Pin → 100k → **GPIO1** → 100k → GND, 100 nF von GPIO1 nach GND | |
+
+Teiler im Detail:
 ```
  5V-Pin ──[100k]──┬──[100k]── GND
                   ├── GPIO1
@@ -24,8 +50,22 @@ Sensor: Capacitive Soil Moisture Sensor v2.0 (HW-390). Das SuperMini führt GPIO
 ```
 Der Teiler besteht aus **zwei gleichen Widerständen** (Faktor 2, Wert frei: 100 kΩ bis 1 MΩ; größer = weniger
 Dauerstrom, 2×1 MΩ ≈ 2 µA). Der 100-nF-Kondensator puffert den ADC bei hohen Widerstandswerten. Er erkennt USB
-(> 4,5 V am 5V-Pin) und misst im Akkubetrieb die Akkuspannung. **Kalibrierung:** In der Weboberfläche die mit
-dem Multimeter gemessene Spannung eintragen, daraus wird ein Korrekturfaktor berechnet (Toleranz, ADC-Offset).
+(> 4,5 V am 5V-Pin) und misst im Akkubetrieb die Akkuspannung.
+
+**ADC-Spannungsbereich:** ESP32-C3 ADC1 ist auf GPIO0–4 verfügbar; der maximale Messbereich liegt bei der höchsten
+Abschwächung bei ungefähr 2,5 V. Prüfe vor dem Betrieb die maximale Spannung an Sensor-AOUT und am ADC-Abgriff des
+Versorgungsteilers. Mit dem beschriebenen 1:1-Teiler liegen bei 5 V am 5V-Pin bereits 2,5 V am ADC an; höhere
+USB-Spannung kann den Messbereich überschreiten. Falls einer der ADC-Eingänge mehr als etwa 2,5 V erreicht, muss
+die betreffende Signalspannung hardwareseitig reduziert werden. Der Arduino-Core initialisiert den ADC beim Aufruf
+von `analogReadMilliVolts()`; eine separate ADC-Initialisierung ist nicht erforderlich.
+
+**Kalibrierung der Versorgungsspannung** (gleicht Widerstandstoleranz und ADC-Offset aus):
+1. Multimeter auf Gleichspannung (V=) stellen. Rote Messspitze an den **5V-Pin** des SuperMini, schwarze an **GND**
+   (Akku oder USB angeschlossen, Gerät läuft).
+2. Portal öffnen (Taster drücken oder USB; `http://192.168.4.1/` bzw. WLAN-IP).
+3. Im Abschnitt „Sensor calibration“ den Wert **in Millivolt** in das Feld *Supply voltage measured with a
+   multimeter (mV)* eintragen (z. B. 4,012 V → `4012`) und *Calibrate supply voltage* drücken.
+4. Der Korrekturfaktor (0,5–1,5) wird gespeichert und unter „Live“ angezeigt.
 
 **Versorgung (laut [SuperMini-Schaltplan](https://make.net.za/wp-content/datasheets/ESP32-C3%20SuperMini%20Schematic.pdf)):**
 Der 5V-Pin liegt direkt am USB-VBUS und über eine Schottky-Diode (BAT60J) am 3,3-V-Regler (ME6211). Ein LiPo
@@ -44,8 +84,8 @@ rund 50 µA.
 
 Ohne gespeicherte Konfiguration startet automatisch das Portal.
 
-## Einstellungen (Weboberfläche)
-WLAN · FHEM-Host/Telnet-Port · Messintervall (60 min) · Wiederholung bei Fehler (5 min) ·
+## Einstellungen (Weboberfläche, englisch)
+Übertragung (WLAN, Bluetooth oder beides) · WLAN · FHEM-Host/Telnet-Port · Messintervall (60 min) · Wiederholung bei Fehler (5 min) ·
 Heartbeat (360 min) · Senden ab Änderung (5 %) · Gießen unter (35 %) · Hysterese (10 %, `water`
 fällt erst ab 45 % zurück) · Gegossen-Erkennung bei Anstieg um (15 %) · Kalibrierung trocken/nass.
 
@@ -54,8 +94,9 @@ Kalibrieren: Sensor trocken in die Luft halten → „TROCKEN speichern“; bis 
 
 ## Bauen & Flashen
 ```
-pio run -t upload
+pio run -t upload          # Entwicklung: Env supermini-debug (Serial-Log, Portal bei jedem Start)
 pio device monitor
+pio run -e supermini -t upload   # Produktiv: kein Log, Portal nur per Taster
 ```
 
 ## FHEM
@@ -67,8 +108,14 @@ define telnetSensors telnet 7072
 ```
 Einrichtung, Readings, Beispiele und Sicherheitshinweise: **[docs/FHEM.md](docs/FHEM.md)**.
 
+Alternativ ohne WLAN im Sensor: Bluetooth (BTHome) über ein Shelly-Gateway-Skript ([fhem/shelly_chili_gateway.js](fhem/shelly_chili_gateway.js)), siehe FHEM.md.
+
 ## Status
-Kompiliert, noch nicht auf Hardware getestet (Kalibrier-Defaults: trocken 3000 mV, nass 1300 mV).
+Kompiliert und läuft (WLAN, BLE, Portal); Messung mit Sensor noch nicht getestet (Kalibrier-Defaults: trocken 3000 mV, nass 1300 mV).
+
+**Umbenennung (v0.4):** Der Sensor hieß zuvor „Chili“. Neue Namen: FHEM-Device `Moisture_<crc>`, AP `MoistureSensor-Setup`,
+Funktion `handleMoistureSensor`. Die Einstellungen (NVS-Namespace) wurden umbenannt und müssen einmalig neu eingegeben
+werden. Alte `Chili_*`-Devices in FHEM können gelöscht werden.
 
 ## Lizenz
 MIT – siehe [LICENSE](LICENSE).

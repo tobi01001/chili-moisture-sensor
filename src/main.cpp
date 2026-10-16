@@ -1,30 +1,36 @@
-// Chili moisture sensor.
+// Moisture sensor.
 // Battery: wake -> measure -> send only if needed -> deep sleep.
-// Button wake (GPIO0): config web server for 5 min, then back to sleep.
+// Button wake (GPIO0) or no valid config: config web server for 5 min, measuring and sending
+// continues meanwhile, then back to the normal cycle.
 // USB (5V present): no sleep, config web server always on, measurement in the loop.
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_sleep.h>
 #include <driver/gpio.h>
+#include "debug.h"
 #include "settings.h"
 #include "sensor.h"
 #include "logic.h"
 #include "fhem.h"
+#include "ble.h"
 #include "portal.h"
 
 static const uint32_t PORTAL_TIMEOUT_MS = 5UL * 60 * 1000;
 
 static Settings cfg;
-static bool usbMode = false;
-static uint32_t lastCycle = 0;
+static bool portalTimeLimited = false;  // portal only for PORTAL_TIMEOUT_MS (battery operation)
+static uint32_t lastCycle = 0;          // millis() of the last measurement cycle, 0 = none yet
 RTC_DATA_ATTR static uint32_t lastSleepMin = 0;
 
 [[noreturn]] static void sleepFor(uint32_t minutes) {
-  Serial.printf("Sleeping %u min\n", (unsigned)minutes);
+  LOGF("Sleeping %u min", (unsigned)minutes);
   lastSleepMin = minutes;
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
 
+  pinMode(PIN_SENSOR_POWER, OUTPUT);
+  digitalWrite(PIN_SENSOR_POWER, LOW);
+  gpio_hold_en((gpio_num_t)PIN_SENSOR_POWER);
   gpio_pullup_en((gpio_num_t)PIN_BUTTON);
   gpio_pulldown_dis((gpio_num_t)PIN_BUTTON);
   gpio_hold_en((gpio_num_t)PIN_BUTTON);
@@ -34,62 +40,103 @@ RTC_DATA_ATTR static uint32_t lastSleepMin = 0;
   esp_deep_sleep_start();
 }
 
-// One measurement cycle. Returns false if a needed transmission failed.
+// One measurement cycle: measure, decide, transmit. Returns false if a needed transmission failed.
 static bool cycle(uint32_t elapsedMin) {
   Reading r = measure(cfg);
   bool send = evaluate(cfg, r, elapsedMin);
-  Serial.printf("raw=%u mV moisture=%u%% supply=%u mV usb=%d water=%d send=%d\n",
-                r.rawMv, r.moisture, r.supplyMv, r.usb, r.needsWater, send);
+  #ifdef DEBUG_FORCE_SEND
+  send = true;
+  #endif
+  LOGF("raw=%u mV moisture=%u%% supply=%u mV usb=%d water=%d send=%d",
+       r.rawMv, r.moisture, r.supplyMv, r.usb, r.needsWater, send);
   if (!send) return true;
-
-  if (WiFi.status() != WL_CONNECTED && !connectWifi(cfg)) return false;
-  bool ok = sendToFhem(cfg, r);
+  debugFlash(3);
+  if (cfg.useBle()) bleSend(r);  // fire and forget, no acknowledgement
+  bool ok = true;
+  if (cfg.useWifi()) {
+    ok = (WiFi.status() == WL_CONNECTED || connectWifi(cfg)) && sendToFhem(cfg, r);
+    if (!ok) wifiCacheInvalidate();  // next attempt: full connect with fresh DHCP
+  }
   if (ok) markSent(r);
   return ok;
 }
 
+// Runs a cycle when the interval (or the shorter retry interval after a failure) has elapsed.
+// Used while the web server is up (portal and USB operation). Returns true if a cycle ran.
+static bool cycleIfDue() {
+  if (!cfg.valid()) return false;  // nowhere to send to yet
+  uint32_t now = millis();
+  if (lastCycle != 0 && now - lastCycle < cfg.intervalMin * 60000UL) return false;
+
+  uint32_t elapsedMin = lastCycle == 0 ? 0 : cfg.intervalMin;
+  lastCycle = now;
+  if (!cycle(elapsedMin)) {
+    // pretend the last cycle happened retryMin after its start so that the retry comes early
+    lastCycle = millis() - (cfg.intervalMin - cfg.retryMin) * 60000UL;
+  }
+  return true;
+}
+
+// While the web server is up, everything that waits (sensor settling, ADC averaging, WiFi connect,
+// TCP, BLE advertising) runs in this task, so loop() keeps serving the web server.
+// It also refreshes the live reading shown in the portal.
+static const uint32_t LIVE_REFRESH_MS = 2000;
+
+static void measureTask(void *) {
+  uint32_t lastLive = 0;
+  for (;;) {
+    if (cycleIfDue()) lastLive = millis();
+    if (millis() - lastLive >= LIVE_REFRESH_MS) {
+      measure(cfg);  // stores the result as live reading
+      lastLive = millis();
+    }
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
+}
+
+static bool wokenByButton(esp_sleep_wakeup_cause_t cause) {
+  return cause == ESP_SLEEP_WAKEUP_GPIO ||
+         (cause == ESP_SLEEP_WAKEUP_UNDEFINED && digitalRead(PIN_BUTTON) == LOW);
+}
+
 void setup() {
-  Serial.begin(115200);
+  debugBegin();
+  LOG("Starting setup...");
   cfg.load();
 
   gpio_deep_sleep_hold_dis();
+  gpio_hold_dis((gpio_num_t)PIN_SENSOR_POWER);
   gpio_hold_dis((gpio_num_t)PIN_BUTTON);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
-  esp_sleep_wakeup_cause_t   cause = esp_sleep_get_wakeup_cause();
-  bool buttonWake = cause == ESP_SLEEP_WAKEUP_GPIO ||
-                    (cause == ESP_SLEEP_WAKEUP_UNDEFINED && digitalRead(PIN_BUTTON) == LOW);
 
-  usbMode = usbPresent(cfg);
 
-  if (buttonWake || !cfg.valid()) {
-    startNetwork(cfg, true);
+  esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+  bool usbMode = usbPresent(cfg);
+  bool portalMode = FORCE_PORTAL || wokenByButton(cause) || !cfg.valid();
+  LOGF("Wake cause: %d, USB mode: %d, portal mode: %d", (int)cause, usbMode, portalMode);
+
+  if (portalMode || usbMode) {
+    // Web server up: loop() serves it and keeps measuring/sending.
+    portalTimeLimited = portalMode && !usbMode;
+    startNetwork(cfg, portalMode);
     addRoutes(cfg);
-    uint32_t t0 = millis();
-    while (!rebootRequested && (usbMode || millis() - t0 < PORTAL_TIMEOUT_MS)) {
-      server.handleClient();
-      delay(2);
-    }
-    delay(500);
-    ESP.restart();  // back to measuring mode
+    xTaskCreate(measureTask, "measure", 10240, nullptr, 1, nullptr);
+    return;
   }
 
-  if (usbMode) {
-    startNetwork(cfg, false);
-    addRoutes(cfg);
-    return;  // loop() takes over
-  }
-
-  uint32_t elapsed = cause == ESP_SLEEP_WAKEUP_TIMER ? lastSleepMin : 0;
-  sleepFor(cycle(elapsed) ? cfg.intervalMin : cfg.retryMin);
+  uint32_t elapsedMin = cause == ESP_SLEEP_WAKEUP_TIMER ? lastSleepMin : 0;
+  sleepFor(cycle(elapsedMin) ? cfg.intervalMin : cfg.retryMin);
 }
 
 void loop() {
   server.handleClient();
-  if (rebootRequested) { delay(500); ESP.restart(); }
-  if (lastCycle == 0 || millis() - lastCycle >= cfg.intervalMin * 60000UL) {
-    uint32_t elapsed = lastCycle == 0 ? 0 : cfg.intervalMin;
-    lastCycle = millis();
-    if (!cycle(elapsed)) lastCycle = millis() - (cfg.intervalMin - cfg.retryMin) * 60000UL;
+  debugLoop();
+
+  static uint32_t restartAt = 0;  // 0 = no restart pending; gives the HTTP response time to go out
+  bool portalExpired = portalTimeLimited && millis() > PORTAL_TIMEOUT_MS;
+  if (restartAt == 0 && (rebootRequested || portalExpired)) restartAt = millis() + 500;
+  if (restartAt != 0 && (int32_t)(millis() - restartAt) >= 0) {
+    ESP.restart();  // back to the normal measuring mode
   }
-  delay(2);
+  vTaskDelay(1);  // one tick: hands the CPU to the measuring and idle tasks, does not wait for anything
 }

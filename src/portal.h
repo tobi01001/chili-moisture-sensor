@@ -64,7 +64,8 @@ static String transportSelect(uint8_t current) {
 }
 
 static String statusSection(const Settings &cfg) {
-  Reading r = measure(cfg);
+  Reading r{};
+  if (!liveGet(r)) return "<section><h2>Live</h2><p>Measuring... reload the page in a moment.</p></section>";
   return "<section><h2>Live</h2><div class=live>" + String(r.moisture) +
          " % <small>moisture (" + String(r.rawMv) + " mV raw)</small></div>"
          "<table><tr><td>Supply</td><td>" + String(r.supplyMv) + " mV (" + (r.usb ? "USB" : "battery") +
@@ -118,18 +119,23 @@ static void addRoutes(Settings &cfg) {
   });
 
   server.on("/cal", [&] {
-    uint16_t mv = measure(cfg).rawMv;
-    if (server.arg("p") == "dry") cfg.rawDry = mv; else cfg.rawWet = mv;
-    cfg.save();
+    Reading r{};
+    if (liveGet(r)) {  // at most a few seconds old, refreshed by the measuring task
+      if (server.arg("p") == "dry") cfg.rawDry = r.rawMv; else cfg.rawWet = r.rawMv;
+      cfg.save();
+    }
     server.sendHeader("Location", "/");
     server.send(303);
   });
 
   server.on("/calsupply", [&] {
     long real = server.arg("mv").toInt();
-    uint16_t raw = rawSupplyMv();
+    Reading live{};
+    uint16_t raw = liveGet(live) ? live.supplyRawMv : 0;
+    LOGF("Calsupply: real=%ld raw=%u", real, raw);
     if (real > 0 && raw > 0) {
       cfg.supplyCalPm = constrain(real * 1000 / raw, 500, 1500);
+      LOGF("Calsupply: new supplyCalPm=%u", cfg.supplyCalPm);
       cfg.save();
     }
     server.sendHeader("Location", "/");

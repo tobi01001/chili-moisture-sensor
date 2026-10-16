@@ -13,7 +13,7 @@ Sensor: Capacitive Soil Moisture Sensor v2.0 (HW-390). Das SuperMini führt GPIO
 |---|---|
 | Sensor VCC | GPIO3 (schaltbar) |
 | Sensor GND | GND |
-| Sensor AOUT | GPIO2 |
+| Sensor AOUT | GPIO4 |
 | Taster nach GND (weckt aus Deep Sleep) | GPIO0 |
 | Versorgungs-Teiler (siehe unten) | GPIO1 |
 
@@ -28,7 +28,7 @@ Sensor: Capacitive Soil Moisture Sensor v2.0 (HW-390). Das SuperMini führt GPIO
  Akku − ─────────────────┴─────────────┴────────────── GND ────┤
                                                                │
  Sensor VCC ◄──────────────────────────────────────── GPIO3 ───┤ (schaltbar)
- Sensor AOUT ─────────────────────────────────────────► GPIO2 ─┤ (ADC: Feuchte)
+ Sensor AOUT ─────────────────────────────────────────► GPIO4 ─┤ (ADC: Feuchte)
  Sensor GND ───────────────────────────────────────────  GND ──┤
  Taster ── GND ──────────────────────────────────────── GPIO0 ─┘ (weckt, Portal)
 ```
@@ -37,7 +37,7 @@ Zusammengefasst:
 | Verbindung | von | nach |
 |---|---|---|
 | Sensor-Versorgung | Sensor VCC | GPIO3 |
-| Sensor-Signal | Sensor AOUT | GPIO2 |
+| Sensor-Signal | Sensor AOUT | GPIO4 |
 | Masse | Sensor GND, Taster, Akku − | GND |
 | Taster | GPIO0 | GND (Pullup intern) |
 | Versorgungs-Teiler | 5V-Pin → 100k → **GPIO1** → 100k → GND, 100 nF von GPIO1 nach GND | |
@@ -51,6 +51,13 @@ Teiler im Detail:
 Der Teiler besteht aus **zwei gleichen Widerständen** (Faktor 2, Wert frei: 100 kΩ bis 1 MΩ; größer = weniger
 Dauerstrom, 2×1 MΩ ≈ 2 µA). Der 100-nF-Kondensator puffert den ADC bei hohen Widerstandswerten. Er erkennt USB
 (> 4,5 V am 5V-Pin) und misst im Akkubetrieb die Akkuspannung.
+
+**ADC-Spannungsbereich:** ESP32-C3 ADC1 ist auf GPIO0–4 verfügbar; der maximale Messbereich liegt bei der höchsten
+Abschwächung bei ungefähr 2,5 V. Prüfe vor dem Betrieb die maximale Spannung an Sensor-AOUT und am ADC-Abgriff des
+Versorgungsteilers. Mit dem beschriebenen 1:1-Teiler liegen bei 5 V am 5V-Pin bereits 2,5 V am ADC an; höhere
+USB-Spannung kann den Messbereich überschreiten. Falls einer der ADC-Eingänge mehr als etwa 2,5 V erreicht, muss
+die betreffende Signalspannung hardwareseitig reduziert werden. Der Arduino-Core initialisiert den ADC beim Aufruf
+von `analogReadMilliVolts()`; eine separate ADC-Initialisierung ist nicht erforderlich.
 
 **Kalibrierung der Versorgungsspannung** (gleicht Widerstandstoleranz und ADC-Offset aus):
 1. Multimeter auf Gleichspannung (V=) stellen. Rote Messspitze an den **5V-Pin** des SuperMini, schwarze an **GND**

@@ -11,7 +11,7 @@ meldet sie bei Bedarf an FHEM und liefert eine Gießempfehlung („Gießen: ja/n
 |----|-------------|
 | H1 | ESP32-C3 SuperMini (GPIO0–10, 20, 21 herausgeführt, kein Lader). |
 | H2 | Sensor: kapazitiver Bodenfeuchtesensor v2.0 / HW-390 (TLC555, Regler), analog an ADC1-Pin. |
-| H3 | Sensor-Versorgung über GPIO schaltbar, nur während der Messung aktiv. |
+| H3 | Sensor-Versorgung über GPIO schaltbar, nur während der Messung aktiv; im Deep Sleep bleibt der Power-GPIO per Hold auf LOW. |
 | H4 | Versorgung 1S-LiPo (3,0–4,2 V) am 5V-Pin; Laden extern. |
 | H5 | Zwei gleiche Teilerwiderstände (frei wählbar, 100 kΩ–1 MΩ) vom 5V-Pin auf einen ADC-Pin: erkennt USB und misst die Akkuspannung. Kalibrierfaktor über die Weboberfläche (Eingabe der real gemessenen Spannung). |
 | H7 | USB und Akku nie gleichzeitig am 5V-Pin (VBUS und 5V-Pin sind verbunden); Trennschalter/Jumper in der Akkuleitung. Power-LED entfernen. |
@@ -45,6 +45,7 @@ meldet sie bei Bedarf an FHEM und liefert eine Gießempfehlung („Gießen: ja/n
 | N2 | Schlanker, gut lesbarer Code; nur Arduino-ESP32-Core. |
 | N3 | PlatformIO; Pins per Build-Flag änderbar. |
 | N4 | Lizenz: MIT. |
+| N5 | Im Dauerbetrieb (USB/Portal) blockiert `loop()` nicht: Messung, Senden und Live-Messwert laufen in einem eigenen Task, die Web-Handler lesen nur den letzten Messwert. Vor dem Deep Sleep darf blockierend gewartet werden. |
 
 ## 5. Schnittstelle FHEM
 - TCP auf FHEM-Telnet-Port (Standard 7072): `{handleMoistureSensor("Moisture_<crc>", "moi 42: raw 2100: …")}` + `exit`.

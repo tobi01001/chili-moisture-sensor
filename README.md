@@ -52,6 +52,16 @@ Der Teiler besteht aus **zwei gleichen Widerständen** (Faktor 2, Wert frei: 100
 Dauerstrom, 2×1 MΩ ≈ 2 µA). Der 100-nF-Kondensator puffert den ADC bei hohen Widerstandswerten. Er erkennt USB
 (> 4,5 V am 5V-Pin) und misst im Akkubetrieb die Akkuspannung.
 
+**Erlaubte / verbotene GPIOs (ESP32-C3 SuperMini):**
+
+| Funktion | Erlaubt | Verboten |
+|---|---|---|
+| Versorgungsspannung messen (`PIN_SUPPLY_ADC`) | GPIO0, 1, 3, 4 (ADC1); GPIO2 nur mit hochohmigem Teiler ohne Pull-down | GPIO5 (ADC2, mit WiFi/BLE nicht nutzbar), GPIO6–10, 20, 21 (kein ADC) |
+| Sensor-VCC treiben (`PIN_SENSOR_POWER1/2`, zwei GPIOs parallel) | GPIO3, 4, 5, 6, 7, 10 (sowie 0/1, falls frei) | GPIO2, 8, 9 (Strapping-Pins: Pegel beim Reset bestimmt den Boot-Modus; GPIO8 = LED, GPIO9 = BOOT-Taster), GPIO18/19 (USB), GPIO20/21 (UART0) |
+| Sensor AOUT messen (`PIN_SENSOR_ADC`) | GPIO0, 1, 3, 4 (ADC1); GPIO2 nur mit Vorsicht | GPIO5 (ADC2), GPIO6–10, 20, 21 (kein ADC) |
+
+Jeder Pin darf nur für eine Funktion verwendet werden. Die Standardbelegung steht in `platformio.ini`.
+
 **ADC-Spannungsbereich:** ESP32-C3 ADC1 ist auf GPIO0–4 verfügbar; der maximale Messbereich liegt bei der höchsten
 Abschwächung bei ungefähr 2,5 V. Prüfe vor dem Betrieb die maximale Spannung an Sensor-AOUT und am ADC-Abgriff des
 Versorgungsteilers. Mit dem beschriebenen 1:1-Teiler liegen bei 5 V am 5V-Pin bereits 2,5 V am ADC an; höhere
@@ -87,7 +97,8 @@ Ohne gespeicherte Konfiguration startet automatisch das Portal.
 ## Einstellungen (Weboberfläche, englisch)
 Übertragung (WLAN, Bluetooth oder beides) · WLAN · FHEM-Host/Telnet-Port · Messintervall (60 min) · Wiederholung bei Fehler (5 min) ·
 Heartbeat (360 min) · Senden ab Änderung (5 %) · Gießen unter (35 %) · Hysterese (10 %, `water`
-fällt erst ab 45 % zurück) · Gegossen-Erkennung bei Anstieg um (15 %) · Kalibrierung trocken/nass.
+fällt erst ab 45 % zurück) · Gegossen-Erkennung bei Anstieg um (15 %) · Kalibrierung trocken/nass ·
+Einschwingzeit des Sensors (1000 ms, 100–5000; nach einer Änderung neu kalibrieren).
 
 Kalibrieren: Sensor trocken in die Luft halten → „TROCKEN speichern“; bis zur Markierung in Wasser →
 „NASS speichern“.
@@ -111,7 +122,7 @@ Einrichtung, Readings, Beispiele und Sicherheitshinweise: **[docs/FHEM.md](docs/
 Alternativ ohne WLAN im Sensor: Bluetooth (BTHome) über ein Shelly-Gateway-Skript ([fhem/shelly_chili_gateway.js](fhem/shelly_chili_gateway.js)), siehe FHEM.md.
 
 ## Status
-Kompiliert und läuft (WLAN, BLE, Portal); Messung mit Sensor noch nicht getestet (Kalibrier-Defaults: trocken 3000 mV, nass 1300 mV).
+Kompiliert und läuft (WLAN, BLE, Portal); Messung mit Sensor noch nicht getestet (Kalibrier-Defaults: trocken 2350 mV, nass 970 mV).
 
 **Umbenennung (v0.4):** Der Sensor hieß zuvor „Chili“. Neue Namen: FHEM-Device `Moisture_<crc>`, AP `MoistureSensor-Setup`,
 Funktion `handleMoistureSensor`. Die Einstellungen (NVS-Namespace) wurden umbenannt und müssen einmalig neu eingegeben

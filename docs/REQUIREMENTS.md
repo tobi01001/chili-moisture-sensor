@@ -31,7 +31,7 @@ meldet sie bei Bedarf an FHEM und liefert eine Gießempfehlung („Gießen: ja/n
 | F9 | Bei Übertragungsfehler Wiederholung nach einstellbarem, kürzerem Intervall. |
 | F10 | Konfigurations-Webserver: Aktivierung durch Taster-Wakeup (Akku/USB) oder dauerhaft bei USB. Erreichbar über WLAN-IP und/oder AP `MoistureSensor-Setup` (192.168.4.1). |
 | F11 | Portal im Akkubetrieb endet nach „Speichern“, „Neustart“ oder 5 min; dann Messmodus. |
-| F12 | Einstellbar: WLAN, FHEM-Host/Telnet-Port, Messintervall, Wiederholintervall, Heartbeat, Änderungsschwelle, Gießschwelle, Hysterese, Gegossen-Sprung, Kalibrierung (inkl. Klick-Kalibrierung mit Live-Anzeige). |
+| F12 | Einstellbar: WLAN, FHEM-Host/Telnet-Port, Messintervall, Wiederholintervall, Heartbeat, Änderungsschwelle, Gießschwelle, Hysterese, Gegossen-Sprung, Einschwingzeit des Sensors, Kalibrierung (inkl. Klick-Kalibrierung mit Live-Anzeige). |
 | F13 | Einstellungen im NVS; Zustand (letzter Wert, Zähler) im RTC-Speicher. |
 | F15 | Kalibrierung der Versorgungsspannung: Eingabe der gemessenen Spannung ergibt einen Korrekturfaktor (0,5–1,5). |
 | F16 | Übertragungsweg wählbar (Portal): WLAN→FHEM (Standard), Bluetooth oder beides (nur zum Testen). Batteriebetrieb-/USB-Erkennung bleibt unabhängig davon. Bei „nur Bluetooth“ bleibt das WLAN im Messmodus aus. |

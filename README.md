@@ -87,7 +87,8 @@ Ohne gespeicherte Konfiguration startet automatisch das Portal.
 ## Einstellungen (Weboberfläche, englisch)
 Übertragung (WLAN, Bluetooth oder beides) · WLAN · FHEM-Host/Telnet-Port · Messintervall (60 min) · Wiederholung bei Fehler (5 min) ·
 Heartbeat (360 min) · Senden ab Änderung (5 %) · Gießen unter (35 %) · Hysterese (10 %, `water`
-fällt erst ab 45 % zurück) · Gegossen-Erkennung bei Anstieg um (15 %) · Kalibrierung trocken/nass.
+fällt erst ab 45 % zurück) · Gegossen-Erkennung bei Anstieg um (15 %) · Kalibrierung trocken/nass ·
+Einschwingzeit des Sensors (1000 ms, 100–5000; nach einer Änderung neu kalibrieren).
 
 Kalibrieren: Sensor trocken in die Luft halten → „TROCKEN speichern“; bis zur Markierung in Wasser →
 „NASS speichern“.

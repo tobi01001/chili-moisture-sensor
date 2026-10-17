@@ -104,6 +104,8 @@ static String settingsSection(const Settings &cfg) {
   h += "</section><section><h2>Raw calibration values</h2>";
   h += field("Dry (mV)", "dry", String(cfg.rawDry));
   h += field("Wet (mV)", "wet", String(cfg.rawWet));
+  h += field("Settle time (ms)", "settle", String(cfg.settleMs), "number",
+             "Wait after sensor power-on before reading (100-5000). Recalibrate dry/wet after changing it");
   h += "</section><button class=main>Save &amp; start measuring</button></form>";
   return h;
 }
@@ -157,6 +159,7 @@ static void addRoutes(Settings &cfg) {
     cfg.wateredJumpPct = constrain(server.arg("jump").toInt(), 1, 100);
     cfg.rawDry = server.arg("dry").toInt();
     cfg.rawWet = server.arg("wet").toInt();
+    cfg.settleMs = constrain(server.arg("settle").toInt(), 100, 5000);
     cfg.save();
     sendPage("<section><h2>Saved</h2><p>Restarting in measuring mode...</p></section>");
     rebootRequested = true;

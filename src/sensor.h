@@ -6,11 +6,6 @@
 // Above this supply voltage (at the 5V pin) we assume USB; a LiPo never exceeds 4.2 V.
 static const uint16_t USB_MIN_MV = 4500;
 
-// Time between switching the sensor on and reading AOUT (build flag overridable).
-#ifndef SENSOR_SETTLE_MS
-  #define SENSOR_SETTLE_MS 1000
-#endif
-
 struct Reading {
   uint16_t rawMv;      // averaged sensor output in mV
   uint8_t moisture;    // 0..100 %
@@ -97,13 +92,13 @@ static Reading measure(const Settings &cfg) {
   // Power the sensor only while measuring.
   outPutSensorPower(true);
 #ifdef DEBUG_SETTLE_LOG
-  // Shows how long the output needs after power-on: tune SENSOR_SETTLE_MS from this.
+  // Shows how long the output needs after power-on: tune the settle time from this.
   for (int t = 0; t <= 10000; t += 50) {
     LOGF("settle %4d ms: %u mV", t, (unsigned)readMv(PIN_SENSOR_ADC));
     delay(50-32);
   }
 #else
-  delay(SENSOR_SETTLE_MS);  // sensor oscillator and output filter must settle
+  delay(cfg.settleMs);  // sensor oscillator and output filter must settle
 #endif
   r.rawMv = readMv(PIN_SENSOR_ADC);
   outPutSensorPower(false);

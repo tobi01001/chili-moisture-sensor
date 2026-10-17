@@ -52,6 +52,17 @@ Der Teiler besteht aus **zwei gleichen Widerständen** (Faktor 2, Wert frei: 100
 Dauerstrom, 2×1 MΩ ≈ 2 µA). Der 100-nF-Kondensator puffert den ADC bei hohen Widerstandswerten. Er erkennt USB
 (> 4,5 V am 5V-Pin) und misst im Akkubetrieb die Akkuspannung.
 
+**Erlaubte / verbotene GPIOs (ESP32-C3 SuperMini):**
+
+| Funktion | Erlaubt | Verboten |
+|---|---|---|
+| Versorgungsspannung messen (`PIN_SUPPLY_ADC`) | GPIO0, 1, 3, 4 (ADC1); GPIO2 nur mit hochohmigem Teiler ohne Pull-down | GPIO5 (ADC2, mit WiFi/BLE nicht nutzbar), GPIO6–10, 20, 21 (kein ADC) |
+| Sensor-VCC treiben (`PIN_SENSOR_POWER1/2`, zwei GPIOs parallel) | GPIO3, 4, 5, 6, 7, 10 (sowie 0/1, falls frei) | GPIO2, 8, 9 (Strapping-Pins: Pegel beim Reset bestimmt den Boot-Modus; GPIO8 = LED, GPIO9 = BOOT-Taster), GPIO18/19 (USB), GPIO20/21 (UART0) |
+| Sensor AOUT messen (`PIN_SENSOR_ADC`) | GPIO0, 1, 3, 4 (ADC1); GPIO2 nur mit Vorsicht | GPIO5 (ADC2), GPIO6–10, 20, 21 (kein ADC) |
+
+Jeder Pin darf nur für eine Funktion verwendet werden. Die Standardbelegung steht in `platformio.ini`.
+**Hinweis:** Die aktuelle Standardbelegung nutzt GPIO9 für `PIN_SENSOR_POWER2`; wegen des Strapping-Risikos sollte stattdessen ein erlaubter Pin (z. B. GPIO5) gewählt werden.
+
 **ADC-Spannungsbereich:** ESP32-C3 ADC1 ist auf GPIO0–4 verfügbar; der maximale Messbereich liegt bei der höchsten
 Abschwächung bei ungefähr 2,5 V. Prüfe vor dem Betrieb die maximale Spannung an Sensor-AOUT und am ADC-Abgriff des
 Versorgungsteilers. Mit dem beschriebenen 1:1-Teiler liegen bei 5 V am 5V-Pin bereits 2,5 V am ADC an; höhere

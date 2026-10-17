@@ -30,13 +30,15 @@ meldet sie bei Bedarf an FHEM und liefert eine Gießempfehlung („Gießen: ja/n
 | F8 | Push per Telnet an FHEM (Perl-Aufruf `handleMoistureSensor`); Gerätename `Moisture_<crc16 der MAC>`, Kurze 3-Buchstaben-Schlüssel (gleich für WLAN und BLE), von der FHEM-Funktion zu Readings expandiert. Auto-Anlage in FHEM: `moisture`, `raw_mv`, `supply_mv`, `usb`, `water`, `watered_ago_h` (+ einmalig Geräteinfo). |
 | F9 | Bei Übertragungsfehler Wiederholung nach einstellbarem, kürzerem Intervall. |
 | F10 | Konfigurations-Webserver: Aktivierung durch Taster-Wakeup (Akku/USB) oder dauerhaft bei USB. Erreichbar über WLAN-IP und/oder AP `MoistureSensor-Setup` (192.168.4.1). |
-| F11 | Portal im Akkubetrieb endet nach „Speichern“, „Neustart“ oder 5 min; dann Messmodus. |
+| F11 | Portal im Akkubetrieb endet nach „Speichern“, „Neustart“ oder 5 min; jede Aktion im Portal (Seite laden, Kalibrieren, Einschwingmessung …) verlängert so, dass mindestens 2 min bleiben. Das automatische Aktualisieren der Seite zählt nicht als Aktion. |
 | F12 | Einstellbar: WLAN, FHEM-Host/Telnet-Port, Messintervall, Wiederholintervall, Heartbeat, Änderungsschwelle, Gießschwelle, Hysterese, Gegossen-Sprung, Einschwingzeit des Sensors, Kalibrierung (inkl. Klick-Kalibrierung mit Live-Anzeige). |
 | F13 | Einstellungen im NVS; Zustand (letzter Wert, Zähler) im RTC-Speicher. |
 | F15 | Kalibrierung der Versorgungsspannung: Eingabe der gemessenen Spannung ergibt einen Korrekturfaktor (0,5–1,5). |
 | F16 | Übertragungsweg wählbar (Portal): WLAN→FHEM (Standard), Bluetooth oder beides (nur zum Testen). Batteriebetrieb-/USB-Erkennung bleibt unabhängig davon. Bei „nur Bluetooth“ bleibt das WLAN im Messmodus aus. |
 | F17 | Bluetooth: nicht verbindbares BTHome-v2-Advertising (Feuchte, Akku %, Spannung, `water`, USB) ohne Gerätenamen-Prefix: lokaler Name nur `<crc>` (31-Byte-Limit; das Gateway-Skript bildet `Moisture_<crc>`), zusätzlich Rohwert, ca. 1,5 s je Meldung. Empfang über Shelly-Gateway-Skript (`fhem/shelly_moisture_gateway.js`, getestet vorgesehen für Shelly Plus Plug S), das per HTTP an FHEM weiterleitet. Kein Rückkanal. |
 | F14 | USB-Betrieb: kein Deep Sleep, Messung im Intervall in der Hauptschleife. |
+| F18 | Die Portalseite (HTML/CSS/JS) liegt im Dateisystem (LittleFS, Ordner `data/`); die Firmware liefert sie aus und stellt eine JSON-API bereit. Messwerte werden von der Seite selbständig aktualisiert. |
+| F19 | Einschwingmessung per Portal: schaltet den Sensor kalt ein und zeichnet den Ausgang (50-ms-Raster, bis 10 s) im Messtask auf; die Seite zeigt Kurve, Werte und einen Vorschlag für die Einschwingzeit. |
 
 ## 4. Nichtfunktionale Anforderungen
 | ID | Anforderung |

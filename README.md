@@ -100,15 +100,23 @@ Heartbeat (360 min) · Senden ab Änderung (5 %) · Gießen unter (35 %) · Hyst
 fällt erst ab 45 % zurück) · Gegossen-Erkennung bei Anstieg um (15 %) · Kalibrierung trocken/nass ·
 Einschwingzeit des Sensors (1000 ms, 100–5000; nach einer Änderung neu kalibrieren).
 
+Die Seite aktualisiert die Messwerte selbständig. Im Abschnitt „Settling curve“ lässt sich die Einschwingkurve
+des Sensors aufzeichnen (Sensor wird kalt eingeschaltet, 3/5/10 s); daraus wird eine Einschwingzeit
+vorgeschlagen („Use as settle time“, danach speichern und neu kalibrieren). Im Akkubetrieb verlängert jede Aktion
+im Portal die Laufzeit auf mindestens 2 min.
+
 Kalibrieren: Sensor trocken in die Luft halten → „TROCKEN speichern“; bis zur Markierung in Wasser →
 „NASS speichern“.
 
 ## Bauen & Flashen
 ```
 pio run -t upload          # Entwicklung: Env supermini-debug (Serial-Log, Portal bei jedem Start)
+pio run -t uploadfs        # Webseite (Ordner data/) ins Dateisystem laden: nach dem ersten Flashen und bei jeder Änderung an data/
 pio device monitor
 pio run -e supermini -t upload   # Produktiv: kein Log, Portal nur per Taster
+pio run -e supermini -t uploadfs
 ```
+Ohne `uploadfs` meldet das Portal, dass die Webdateien fehlen.
 
 ## FHEM
 Push per Telnet wie beim Temperatursensor. Der Gerätename `Chili_<crc16 der MAC>` wird automatisch gebildet,

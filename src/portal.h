@@ -1,6 +1,7 @@
 #pragma once
 #include <WiFi.h>
 #include <WebServer.h>
+#include <LittleFS.h>
 #include "debug.h"
 #include "settings.h"
 #include "sensor.h"
@@ -9,142 +10,145 @@
 
 // Config web server. Reachable in the WiFi (IP on the serial console) and/or
 // via the access point "MoistureSensor-Setup" at 192.168.4.1.
+// The web page itself (data/index.html, style.css, app.js) lives in LittleFS ("pio run -t uploadfs");
+// the firmware only serves it and provides a small JSON API.
 static WebServer server(80);
 static bool rebootRequested = false;
+static bool fsMounted = false;
 
-static const char *PAGE_HEAD =
-  "<!doctype html><html lang=en><head><meta charset=utf-8>"
-  "<meta name=viewport content='width=device-width,initial-scale=1'>"
-  "<title>Moisture Sensor</title><style>"
-  "body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#eef2ee;color:#222;"
-  "margin:0;padding:12px}"
-  "main{max-width:480px;margin:0 auto}"
-  "h1{font-size:1.4em;margin:.3em 0}h1 small{display:block;font-size:.55em;color:#667;font-weight:400}"
-  "section{background:#fff;border-radius:10px;padding:12px 16px;margin:12px 0;"
-  "box-shadow:0 1px 3px #0002}"
-  "h2{font-size:1em;margin:.2em 0 .6em;color:#2e7d32;text-transform:uppercase;letter-spacing:.05em}"
-  "label{display:block;margin:.7em 0 .2em;font-size:.9em;color:#444}"
-  "input,select{width:100%;box-sizing:border-box;padding:9px;font-size:1em;border:1px solid #bbb;"
-  "border-radius:6px;background:#fff}"
-  "small.hint{display:block;color:#778;margin-top:3px}"
-  "button,a.btn{display:inline-block;box-sizing:border-box;background:#2e7d32;color:#fff;border:0;"
-  "border-radius:6px;padding:10px 14px;font-size:1em;text-decoration:none;margin:8px 6px 0 0;"
-  "cursor:pointer}"
-  "button.main{width:100%;margin:12px 0 0;padding:13px}"
-  "a.btn.sec{background:#607d8b}"
-  ".live{font-size:2em;font-weight:600}.live small{font-size:.45em;font-weight:400;color:#556}"
-  "table{width:100%;border-collapse:collapse}td{padding:3px 0}td+td{text-align:right}"
-  "</style></head><body><main>";
+// Battery operation: the portal closes PORTAL_TIMEOUT_MS after start. Every user action in the
+// web UI guarantees at least PORTAL_EXTEND_MS more. Polling requests do not count as actions.
+static const uint32_t PORTAL_TIMEOUT_MS = 5UL * 60 * 1000;
+static const uint32_t PORTAL_EXTEND_MS = 2UL * 60 * 1000;
+static bool portalTimeLimited = false;
+static uint32_t portalDeadlineMs = PORTAL_TIMEOUT_MS;
 
-static String htmlEscape(String s) {
-  s.replace("&", "&amp;"); s.replace("\"", "&quot;"); s.replace("<", "&lt;"); s.replace(">", "&gt;");
-  return s;
+static void portalTouch() {
+  uint32_t d = millis() + PORTAL_EXTEND_MS;
+  if ((int32_t)(d - portalDeadlineMs) > 0) portalDeadlineMs = d;
 }
 
-static void sendPage(const String &body) {
-  server.send(200, "text/html; charset=utf-8", String(PAGE_HEAD) + body + "</main></body></html>");
+static bool portalExpiredNow() { return (int32_t)(millis() - portalDeadlineMs) > 0; }
+
+static int32_t portalLeftS() {
+  if (!portalTimeLimited) return -1;
+  int32_t left = (int32_t)(portalDeadlineMs - millis());
+  return left > 0 ? left / 1000 : 0;
 }
 
-static String field(const char *label, const char *name, const String &val,
-                    const char *type = "number", const char *hint = "") {
-  String h = String("<label>") + label + "<input name=" + name + " type=" + type +
-             (strcmp(type, "number") == 0 ? " inputmode=numeric" : "") +
-             " value=\"" + htmlEscape(val) + "\">";
-  if (*hint) h += String("<small class=hint>") + hint + "</small>";
-  return h + "</label>";
+static String jsonStr(const String &s) {
+  String o = "\"";
+  for (size_t i = 0; i < s.length(); i++) {
+    char c = s[i];
+    if (c == '"' || c == '\\') { o += '\\'; o += c; }
+    else if ((uint8_t)c < 0x20) { char b[8]; snprintf(b, sizeof b, "\\u%04x", c); o += b; }
+    else o += c;
+  }
+  return o + "\"";
 }
 
-static String transportSelect(uint8_t current) {
-  const char *names[] = {"WiFi (FHEM telnet)", "Bluetooth (BTHome via Shelly gateway)",
-                         "WiFi + Bluetooth (test)"};
-  String h = "<label>Transmission<select name=tr>";
-  for (int i = 0; i < 3; i++)
-    h += String("<option value=") + i + (current == i ? " selected" : "") + ">" + names[i] + "</option>";
-  return h + "</select></label>";
+static void sendJson(const String &body, int code = 200) {
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(code, "application/json", body);
 }
 
-static String statusSection(const Settings &cfg) {
+static void serveFile(const char *path, const char *mime) {
+  File f = fsMounted ? LittleFS.open(path, "r") : File();
+  if (!f) {
+    server.send(404, "text/plain",
+                "Web files not found in the device filesystem. Upload them with: pio run -t uploadfs");
+    return;
+  }
+  server.sendHeader("Cache-Control", "no-cache");
+  server.streamFile(f, mime);
+  f.close();
+}
+
+static String stateJson(const Settings &cfg) {
   Reading r{};
-  if (!liveGet(r)) return "<section><h2>Live</h2><p>Measuring... reload the page in a moment.</p></section>";
-  return "<section><h2>Live</h2><div class=live>" + String(r.moisture) +
-         " % <small>moisture (" + String(r.rawMv) + " mV raw)</small></div>"
-         "<table><tr><td>Supply</td><td>" + String(r.supplyMv) + " mV (" + (r.usb ? "USB" : "battery") +
-         ")</td></tr><tr><td>Supply calibration factor</td><td>" + String(cfg.supplyCalPm / 1000.0, 3) +
-         "</td></tr><tr><td>Firmware</td><td>" + FW_VERSION + "</td></tr></table></section>";
+  uint32_t age = 0;
+  bool have = liveGet(r, &age);
+  String j = "{\"dev\":" + jsonStr(deviceName()) + ",\"fw\":" + jsonStr(FW_VERSION) +
+             ",\"cal\":" + String(cfg.supplyCalPm / 1000.0, 3) + ",\"left\":" + String(portalLeftS()) +
+             ",\"have\":" + (have ? "true" : "false");
+  if (have) {
+    j += ",\"moisture\":" + String(r.moisture) + ",\"raw\":" + String(r.rawMv) +
+         ",\"supply\":" + String(r.supplyMv) + ",\"usb\":" + (r.usb ? "true" : "false") +
+         ",\"age\":" + String(age);
+  }
+  return j + "}";
 }
 
-static String calibrationSection() {
-  return "<section><h2>Sensor calibration</h2>"
-         "<p>Hold the sensor dry in the air and press <i>Save as DRY</i>. Then put it into water up to "
-         "the marking and press <i>Save as WET</i>.</p>"
-         "<a class=btn href='/cal?p=dry'>Save as DRY</a><a class=btn href='/cal?p=wet'>Save as WET</a>"
-         "<hr><form action=/calsupply><label>Supply voltage measured with a multimeter (mV)"
-         "<input name=mv type=number inputmode=numeric placeholder='e.g. 4012'>"
-         "<small class=hint>Measure between the 5V pin and GND of the board (battery or USB connected), "
-         "enter the value in millivolts.</small></label>"
-         "<button>Calibrate supply voltage</button></form></section>";
+static String settingsJson(const Settings &cfg) {
+  return "{\"tr\":" + String(cfg.transport) + ",\"ssid\":" + jsonStr(cfg.ssid) +
+         ",\"pass\":" + jsonStr(cfg.pass) + ",\"host\":" + jsonStr(cfg.fhemHost) +
+         ",\"port\":" + String(cfg.fhemPort) + ",\"int\":" + String(cfg.intervalMin) +
+         ",\"retry\":" + String(cfg.retryMin) + ",\"hb\":" + String(cfg.heartbeatMin) +
+         ",\"delta\":" + String(cfg.deltaPct) + ",\"thr\":" + String(cfg.waterBelowPct) +
+         ",\"hyst\":" + String(cfg.hystPct) + ",\"jump\":" + String(cfg.wateredJumpPct) +
+         ",\"dry\":" + String(cfg.rawDry) + ",\"wet\":" + String(cfg.rawWet) +
+         ",\"settle\":" + String(cfg.settleMs) + "}";
 }
 
-static String settingsSection(const Settings &cfg) {
-  String h = "<form method=post action=/save><section><h2>Transmission</h2>";
-  h += transportSelect(cfg.transport);
-  h += field("WiFi SSID", "ssid", cfg.ssid, "text");
-  h += field("WiFi password", "pass", cfg.pass, "password");
-  h += field("FHEM host", "host", cfg.fhemHost, "text", "IP address or name of the FHEM server");
-  h += field("FHEM telnet port", "port", String(cfg.fhemPort));
-  h += "</section><section><h2>Timing</h2>";
-  h += field("Measurement interval (min)", "int", String(cfg.intervalMin));
-  h += field("Retry after failure (min)", "retry", String(cfg.retryMin));
-  h += field("Heartbeat (min)", "hb", String(cfg.heartbeatMin), "number", "Send at least this often");
-  h += field("Send on change of (% moisture)", "delta", String(cfg.deltaPct));
-  h += "</section><section><h2>Watering</h2>";
-  h += field("Water below (%)", "thr", String(cfg.waterBelowPct));
-  h += field("Hysteresis (%)", "hyst", String(cfg.hystPct), "number", "Watering state clears at threshold + hysteresis");
-  h += field("Detect watering: rise by (%)", "jump", String(cfg.wateredJumpPct));
-  h += "</section><section><h2>Raw calibration values</h2>";
-  h += field("Dry (mV)", "dry", String(cfg.rawDry));
-  h += field("Wet (mV)", "wet", String(cfg.rawWet));
-  h += field("Settle time (ms)", "settle", String(cfg.settleMs), "number",
-             "Wait after sensor power-on before reading (100-5000). Recalibrate dry/wet after changing it");
-  h += "</section><button class=main>Save &amp; start measuring</button></form>";
-  return h;
+static String settleJson() {
+  static SettleCurve c;  // too big for the handler stack; handlers never run concurrently
+  settleGet(c);
+  String j = "{\"state\":" + String(c.state) + ",\"step\":" + String(SETTLE_STEP_MS) +
+             ",\"wanted\":" + String(c.wanted) + ",\"mv\":[";
+  for (uint16_t i = 0; i < c.count; i++) {
+    if (i) j += ',';
+    j += c.mv[i];
+  }
+  return j + "]}";
 }
 
 static void addRoutes(Settings &cfg) {
-  server.on("/", [&] {
-    String h = "<h1>Moisture Sensor<small>Device: " + deviceName() + "</small></h1>";
-    h += statusSection(cfg);
-    h += calibrationSection();
-    h += settingsSection(cfg);
-    h += "<p><a class='btn sec' href='/reboot'>Restart without saving</a></p>";
-    sendPage(h);
-  });
+  fsMounted = LittleFS.begin(false);
+  if (!fsMounted) LOG("LittleFS mount failed: upload the web files with 'pio run -t uploadfs'");
 
-  server.on("/cal", [&] {
+  server.on("/", [] {
+    portalTouch();
+    serveFile("/index.html", "text/html; charset=utf-8");
+  });
+  server.on("/style.css", [] { serveFile("/style.css", "text/css"); });
+  server.on("/app.js", [] { serveFile("/app.js", "application/javascript"); });
+
+  // Polled by the page; must not count as user activity.
+  server.on("/api/state", HTTP_GET, [&] { sendJson(stateJson(cfg)); });
+  server.on("/api/settings", HTTP_GET, [&] { sendJson(settingsJson(cfg)); });
+  server.on("/api/settle", HTTP_GET, [] { sendJson(settleJson()); });
+
+  server.on("/api/cal", HTTP_POST, [&] {
+    portalTouch();
     Reading r{};
-    if (liveGet(r)) {  // at most a few seconds old, refreshed by the measuring task
-      if (server.arg("p") == "dry") cfg.rawDry = r.rawMv; else cfg.rawWet = r.rawMv;
-      cfg.save();
-    }
-    server.sendHeader("Location", "/");
-    server.send(303);
+    if (!liveGet(r)) return sendJson("{\"error\":\"no reading yet\"}", 409);  // refreshed by the measuring task
+    if (server.arg("p") == "dry") cfg.rawDry = r.rawMv; else cfg.rawWet = r.rawMv;
+    cfg.save();
+    sendJson("{\"ok\":true}");
   });
 
-  server.on("/calsupply", [&] {
+  server.on("/api/calsupply", HTTP_POST, [&] {
+    portalTouch();
     long real = server.arg("mv").toInt();
     Reading live{};
     uint16_t raw = liveGet(live) ? live.supplyRawMv : 0;
     LOGF("Calsupply: real=%ld raw=%u", real, raw);
-    if (real > 0 && raw > 0) {
-      cfg.supplyCalPm = constrain(real * 1000 / raw, 500, 1500);
-      LOGF("Calsupply: new supplyCalPm=%u", cfg.supplyCalPm);
-      cfg.save();
-    }
-    server.sendHeader("Location", "/");
-    server.send(303);
+    if (real <= 0 || raw == 0) return sendJson("{\"error\":\"invalid value or no reading yet\"}", 400);
+    cfg.supplyCalPm = constrain(real * 1000 / raw, 500, 1500);
+    LOGF("Calsupply: new supplyCalPm=%u", cfg.supplyCalPm);
+    cfg.save();
+    sendJson("{\"ok\":true}");
+  });
+
+  server.on("/api/settle", HTTP_POST, [] {
+    portalTouch();
+    long ms = constrain(server.arg("ms").toInt(), 500, 10000);
+    if (!settleRequest(ms)) return sendJson("{\"error\":\"already running\"}", 409);
+    sendJson("{\"ok\":true}");
   });
 
   server.on("/save", HTTP_POST, [&] {
+    portalTouch();
     cfg.transport = constrain(server.arg("tr").toInt(), 0, 2);
     cfg.ssid = server.arg("ssid");
     cfg.pass = server.arg("pass");
@@ -161,12 +165,12 @@ static void addRoutes(Settings &cfg) {
     cfg.rawWet = server.arg("wet").toInt();
     cfg.settleMs = constrain(server.arg("settle").toInt(), 100, 5000);
     cfg.save();
-    sendPage("<section><h2>Saved</h2><p>Restarting in measuring mode...</p></section>");
+    sendJson("{\"ok\":true}");
     rebootRequested = true;
   });
 
-  server.on("/reboot", [] {
-    sendPage("<section><h2>Restarting</h2><p>Restarting in measuring mode...</p></section>");
+  server.on("/api/reboot", HTTP_POST, [] {
+    sendJson("{\"ok\":true}");
     rebootRequested = true;
   });
   server.begin();

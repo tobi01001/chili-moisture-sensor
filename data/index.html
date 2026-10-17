@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Moisture Sensor</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+<h1>Moisture Sensor<small id="dev"></small></h1>
+<div id="conn" class="banner" hidden>No connection to the device (restarting or portal closed?). Retrying...</div>
+<p id="msg"></p>
+
+<section>
+  <h2>Live</h2>
+  <div class="live"><span id="moist">-</span> % <small>moisture (<span id="raw">-</span> mV raw)</small></div>
+  <table>
+    <tr><td>Supply</td><td id="supply">-</td></tr>
+    <tr><td>Supply calibration factor</td><td id="cal">-</td></tr>
+    <tr><td>Reading age</td><td id="age">-</td></tr>
+    <tr><td>Firmware</td><td id="fw">-</td></tr>
+    <tr><td>Portal closes in</td><td id="left">-</td></tr>
+  </table>
+  <small class="hint">Updates automatically. Every action you take keeps the portal open for at least 2 more minutes.</small>
+</section>
+
+<section>
+  <h2>Sensor calibration</h2>
+  <p>Hold the sensor dry in the air and press <i>Save as DRY</i>. Then put it into water up to the marking and press <i>Save as WET</i>.</p>
+  <button id="calDry">Save as DRY</button><button id="calWet">Save as WET</button>
+  <hr>
+  <form id="supplyForm">
+    <label>Supply voltage measured with a multimeter (mV)
+      <input name="mv" type="number" inputmode="numeric" placeholder="e.g. 4012">
+      <small class="hint">Measure between the 5V pin and GND of the board (battery or USB connected), enter the value in millivolts.</small>
+    </label>
+    <button>Calibrate supply voltage</button>
+  </form>
+</section>
+
+<section>
+  <h2>Settling curve</h2>
+  <p>Switches the sensor on and records its output over time. Use it to find how long the output needs to settle.</p>
+  <div class="row">
+    <label>Duration
+      <select id="curveDur">
+        <option value="3000">3 s</option>
+        <option value="5000" selected>5 s</option>
+        <option value="10000">10 s</option>
+      </select>
+    </label>
+    <button id="curveStart">Measure</button>
+  </div>
+  <p id="curveState"></p>
+  <svg id="chart" viewBox="0 0 400 170" hidden></svg>
+  <div id="curveResult" hidden>
+    <div class="row">
+      <label>Tolerance (mV)<input id="tol" type="number" inputmode="numeric" value="10" min="1"></label>
+      <button id="useSettle" class="sec">Use as settle time</button>
+    </div>
+    <p id="suggest"></p>
+    <details><summary>Values (ms;mV)</summary><pre id="csv"></pre></details>
+  </div>
+</section>
+
+<form id="settings">
+  <section>
+    <h2>Transmission</h2>
+    <label>Transmission
+      <select name="tr">
+        <option value="0">WiFi (FHEM telnet)</option>
+        <option value="1">Bluetooth (BTHome via Shelly gateway)</option>
+        <option value="2">WiFi + Bluetooth (test)</option>
+      </select>
+    </label>
+    <label>WiFi SSID<input name="ssid" type="text"></label>
+    <label>WiFi password<input name="pass" type="password"></label>
+    <label>FHEM host<input name="host" type="text"><small class="hint">IP address or name of the FHEM server</small></label>
+    <label>FHEM telnet port<input name="port" type="number" inputmode="numeric"></label>
+  </section>
+  <section>
+    <h2>Timing</h2>
+    <label>Measurement interval (min)<input name="int" type="number" inputmode="numeric"></label>
+    <label>Retry after failure (min)<input name="retry" type="number" inputmode="numeric"></label>
+    <label>Heartbeat (min)<input name="hb" type="number" inputmode="numeric"><small class="hint">Send at least this often</small></label>
+    <label>Send on change of (% moisture)<input name="delta" type="number" inputmode="numeric"></label>
+  </section>
+  <section>
+    <h2>Watering</h2>
+    <label>Water below (%)<input name="thr" type="number" inputmode="numeric"></label>
+    <label>Hysteresis (%)<input name="hyst" type="number" inputmode="numeric"><small class="hint">Watering state clears at threshold + hysteresis</small></label>
+    <label>Detect watering: rise by (%)<input name="jump" type="number" inputmode="numeric"></label>
+  </section>
+  <section>
+    <h2>Raw calibration values</h2>
+    <label>Dry (mV)<input name="dry" type="number" inputmode="numeric"></label>
+    <label>Wet (mV)<input name="wet" type="number" inputmode="numeric"></label>
+    <label>Settle time (ms)<input name="settle" type="number" inputmode="numeric"><small class="hint">Wait after sensor power-on before reading (100-5000). Recalibrate dry/wet after changing it</small></label>
+  </section>
+  <button class="main">Save &amp; start measuring</button>
+</form>
+<p><button id="reboot" class="sec">Restart without saving</button></p>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>

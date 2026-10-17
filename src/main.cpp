@@ -15,10 +15,7 @@
 #include "ble.h"
 #include "portal.h"
 
-static const uint32_t PORTAL_TIMEOUT_MS = 5UL * 60 * 1000;
-
 static Settings cfg;
-static bool portalTimeLimited = false;  // portal only for PORTAL_TIMEOUT_MS (battery operation)
 static uint32_t lastCycle = 0;          // millis() of the last measurement cycle, 0 = none yet
 RTC_DATA_ATTR static uint32_t lastSleepMin = 0;
 
@@ -85,6 +82,10 @@ static const uint32_t LIVE_REFRESH_MS = 2000;
 static void measureTask(void *) {
   uint32_t lastLive = 0;
   for (;;) {
+    if (settleRequested()) {
+      settleRun();
+      lastLive = millis();
+    }
     if (cycleIfDue()) lastLive = millis();
     if (millis() - lastLive >= LIVE_REFRESH_MS) {
       measure(cfg);  // stores the result as live reading
@@ -134,7 +135,7 @@ void loop() {
   debugLoop();
 
   static uint32_t restartAt = 0;  // 0 = no restart pending; gives the HTTP response time to go out
-  bool portalExpired = portalTimeLimited && millis() > PORTAL_TIMEOUT_MS;
+  bool portalExpired = portalTimeLimited && portalExpiredNow();
   if (restartAt == 0 && (rebootRequested || portalExpired)) restartAt = millis() + 500;
   if (restartAt != 0 && (int32_t)(millis() - restartAt) >= 0) {
     ESP.restart();  // back to the normal measuring mode

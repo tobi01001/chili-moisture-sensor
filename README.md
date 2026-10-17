@@ -61,7 +61,6 @@ Dauerstrom, 2×1 MΩ ≈ 2 µA). Der 100-nF-Kondensator puffert den ADC bei hohe
 | Sensor AOUT messen (`PIN_SENSOR_ADC`) | GPIO0, 1, 3, 4 (ADC1); GPIO2 nur mit Vorsicht | GPIO5 (ADC2), GPIO6–10, 20, 21 (kein ADC) |
 
 Jeder Pin darf nur für eine Funktion verwendet werden. Die Standardbelegung steht in `platformio.ini`.
-**Hinweis:** Die aktuelle Standardbelegung nutzt GPIO9 für `PIN_SENSOR_POWER2`; wegen des Strapping-Risikos sollte stattdessen ein erlaubter Pin (z. B. GPIO5) gewählt werden.
 
 **ADC-Spannungsbereich:** ESP32-C3 ADC1 ist auf GPIO0–4 verfügbar; der maximale Messbereich liegt bei der höchsten
 Abschwächung bei ungefähr 2,5 V. Prüfe vor dem Betrieb die maximale Spannung an Sensor-AOUT und am ADC-Abgriff des

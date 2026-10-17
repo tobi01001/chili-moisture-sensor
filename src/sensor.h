@@ -35,38 +35,90 @@ static void outPutSensorPower(bool on) {
   gpio_set_drive_capability((gpio_num_t)PIN_SENSOR_POWER2, GPIO_DRIVE_CAP_3);
 }
 
+static uint32_t liveStampMs = 0;  // millis() of the last liveStore()
+
 static void liveStore(const Reading &r) {
   portENTER_CRITICAL(&liveMux);
   liveReading = r;
   liveValid = true;
+  liveStampMs = millis();
   portEXIT_CRITICAL(&liveMux);
 }
 
-static bool liveGet(Reading &r) {
+// ageMs (optional): how old the reading is.
+static bool liveGet(Reading &r, uint32_t *ageMs = nullptr) {
   portENTER_CRITICAL(&liveMux);
   bool ok = liveValid;
   if (ok) r = liveReading;
+  if (ageMs) *ageMs = millis() - liveStampMs;
   portEXIT_CRITICAL(&liveMux);
   return ok;
 }
 
+// Settling curve: the sensor output after power-on, recorded on request from the portal. The
+// recording runs in the measuring task (the only one touching the sensor), the web handlers only
+// request it and read the result.
+static const uint16_t SETTLE_STEP_MS = 50;
+static const uint16_t SETTLE_MAX_SAMPLES = 201;  // 0..10000 ms
+enum SettleState : uint8_t { SETTLE_IDLE = 0, SETTLE_REQUESTED, SETTLE_RUNNING, SETTLE_DONE };
+
+struct SettleCurve {
+  uint8_t state = SETTLE_IDLE;
+  uint16_t wanted = 0;                  // number of samples requested
+  uint16_t count = 0;                   // number of samples recorded so far
+  uint16_t mv[SETTLE_MAX_SAMPLES] = {};
+};
+static SettleCurve settleCurve;
+
+// Returns false if a recording is already pending or running.
+static bool settleRequest(uint16_t durationMs) {
+  uint16_t n = constrain(durationMs / SETTLE_STEP_MS + 1, 2, (int)SETTLE_MAX_SAMPLES);
+  portENTER_CRITICAL(&liveMux);
+  bool ok = settleCurve.state != SETTLE_REQUESTED && settleCurve.state != SETTLE_RUNNING;
+  if (ok) {
+    settleCurve.state = SETTLE_REQUESTED;
+    settleCurve.wanted = n;
+    settleCurve.count = 0;
+  }
+  portEXIT_CRITICAL(&liveMux);
+  return ok;
+}
+
+static bool settleRequested() {
+  portENTER_CRITICAL(&liveMux);
+  bool r = settleCurve.state == SETTLE_REQUESTED;
+  portEXIT_CRITICAL(&liveMux);
+  return r;
+}
+
+static void settleGet(SettleCurve &out) {
+  portENTER_CRITICAL(&liveMux);
+  out = settleCurve;
+  portEXIT_CRITICAL(&liveMux);
+}
+
 // Average several ADC samples (in mV) to suppress noise. Blocking (~32 ms): call it from the
 // measuring task or before deep sleep, never from loop().
-static uint16_t readMv(int pin) {
+static uint16_t sampleMv(int pin) {
   uint32_t sum = 0;
   for (int i = 0; i < 16; i++) {
     sum += analogReadMilliVolts(pin);
     delay(2);
   }
+  return sum / 16;
+}
+
+static uint16_t readMv(int pin) {
+  uint16_t mv = sampleMv(pin);
   if(pin == PIN_SENSOR_ADC) {
-    LOGF("Sensor raw mV: %lu", sum / 16);
+    LOGF("Sensor raw mV: %u", mv);
   } else if(pin == PIN_SUPPLY_ADC) {
-    LOGF("Supply raw mV: %lu", sum / 16);
+    LOGF("Supply raw mV: %u", mv);
   }
   else {
-    LOGF("readMv(%d) = %lu", pin, sum / 16);
+    LOGF("readMv(%d) = %u", pin, mv);
   }
-  return sum / 16;
+  return mv;
 }
 
 // Two equal resistors form the divider (any value, e.g. 100k..1M): factor 2.
@@ -84,15 +136,7 @@ static Reading measure(const Settings &cfg) {
 
   // Power the sensor only while measuring.
   outPutSensorPower(true);
-#ifdef DEBUG_SETTLE_LOG
-  // Shows how long the output needs after power-on: tune the settle time from this.
-  for (int t = 0; t <= 10000; t += 50) {
-    LOGF("settle %4d ms: %u mV", t, (unsigned)readMv(PIN_SENSOR_ADC));
-    delay(50-32);
-  }
-#else
   delay(cfg.settleMs);  // sensor oscillator and output filter must settle
-#endif
   r.rawMv = readMv(PIN_SENSOR_ADC);
   outPutSensorPower(false);
 
@@ -107,4 +151,32 @@ static Reading measure(const Settings &cfg) {
   r.wateredAgoH = -1;
   liveStore(r);
   return r;
+}
+
+// Records the settling curve (called by the measuring task after settleRequested()).
+// Starts from a switched-off sensor so that every curve is a cold start.
+static void settleRun() {
+  uint16_t n;
+  portENTER_CRITICAL(&liveMux);
+  settleCurve.state = SETTLE_RUNNING;
+  n = settleCurve.wanted;
+  portEXIT_CRITICAL(&liveMux);
+
+  outPutSensorPower(false);
+  delay(500);
+  uint32_t t0 = millis();
+  outPutSensorPower(true);
+  for (uint16_t i = 0; i < n; i++) {
+    while ((uint32_t)(millis() - t0) < (uint32_t)i * SETTLE_STEP_MS) delay(1);
+    uint16_t mv = sampleMv(PIN_SENSOR_ADC);
+    portENTER_CRITICAL(&liveMux);
+    settleCurve.mv[i] = mv;
+    settleCurve.count = i + 1;
+    portEXIT_CRITICAL(&liveMux);
+  }
+  outPutSensorPower(false);
+  portENTER_CRITICAL(&liveMux);
+  settleCurve.state = SETTLE_DONE;
+  portEXIT_CRITICAL(&liveMux);
+  LOGF("Settling curve recorded: %u samples", n);
 }

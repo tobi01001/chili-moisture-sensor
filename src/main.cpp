@@ -28,9 +28,9 @@ RTC_DATA_ATTR static uint32_t lastSleepMin = 0;
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
 
-  pinMode(PIN_SENSOR_POWER, OUTPUT);
-  digitalWrite(PIN_SENSOR_POWER, LOW);
-  gpio_hold_en((gpio_num_t)PIN_SENSOR_POWER);
+  outPutSensorPower(false);
+  gpio_hold_en((gpio_num_t)PIN_SENSOR_POWER1);
+  gpio_hold_en((gpio_num_t)PIN_SENSOR_POWER2);
   gpio_pullup_en((gpio_num_t)PIN_BUTTON);
   gpio_pulldown_dis((gpio_num_t)PIN_BUTTON);
   gpio_hold_en((gpio_num_t)PIN_BUTTON);
@@ -105,7 +105,8 @@ void setup() {
   cfg.load();
 
   gpio_deep_sleep_hold_dis();
-  gpio_hold_dis((gpio_num_t)PIN_SENSOR_POWER);
+  gpio_hold_dis((gpio_num_t)PIN_SENSOR_POWER1);
+  gpio_hold_dis((gpio_num_t)PIN_SENSOR_POWER2);
   gpio_hold_dis((gpio_num_t)PIN_BUTTON);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
 

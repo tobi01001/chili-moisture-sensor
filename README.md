@@ -111,7 +111,7 @@ Einrichtung, Readings, Beispiele und Sicherheitshinweise: **[docs/FHEM.md](docs/
 Alternativ ohne WLAN im Sensor: Bluetooth (BTHome) über ein Shelly-Gateway-Skript ([fhem/shelly_chili_gateway.js](fhem/shelly_chili_gateway.js)), siehe FHEM.md.
 
 ## Status
-Kompiliert und läuft (WLAN, BLE, Portal); Messung mit Sensor noch nicht getestet (Kalibrier-Defaults: trocken 3000 mV, nass 1300 mV).
+Kompiliert und läuft (WLAN, BLE, Portal); Messung mit Sensor noch nicht getestet (Kalibrier-Defaults: trocken 2350 mV, nass 970 mV).
 
 **Umbenennung (v0.4):** Der Sensor hieß zuvor „Chili“. Neue Namen: FHEM-Device `Moisture_<crc>`, AP `MoistureSensor-Setup`,
 Funktion `handleMoistureSensor`. Die Einstellungen (NVS-Namespace) wurden umbenannt und müssen einmalig neu eingegeben

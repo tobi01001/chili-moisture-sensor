@@ -17,8 +17,8 @@ struct Settings {
   uint8_t waterBelowPct = 35;    // water = 1 below this moisture ...
   uint8_t hystPct = 10;          // ... and back to 0 at threshold + hysteresis
   uint8_t wateredJumpPct = 15;   // a rise by this much counts as "watered"
-  uint16_t rawDry = 3000;        // sensor mV in dry air
-  uint16_t rawWet = 1300;        // sensor mV in water
+  uint16_t   rawDry = 2350;        // sensor mV in dry air
+    uint16_t rawWet = 970;          // sensor mV in water
   uint16_t supplyCalPm = 1000;   // supply voltage correction in per mille (1000 = 1.000)
 
   bool useWifi() const { return transport != TR_BLE; }

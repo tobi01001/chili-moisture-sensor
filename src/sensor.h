@@ -1,9 +1,15 @@
 #pragma once
 #include <Arduino.h>
+#include <driver/gpio.h>
 #include "settings.h"
 
 // Above this supply voltage (at the 5V pin) we assume USB; a LiPo never exceeds 4.2 V.
 static const uint16_t USB_MIN_MV = 4500;
+
+// Time between switching the sensor on and reading AOUT (build flag overridable).
+#ifndef SENSOR_SETTLE_MS
+  #define SENSOR_SETTLE_MS 1000
+#endif
 
 struct Reading {
   uint16_t rawMv;      // averaged sensor output in mV
@@ -21,6 +27,25 @@ struct Reading {
 static Reading liveReading;
 static bool liveValid = false;
 static portMUX_TYPE liveMux = portMUX_INITIALIZER_UNLOCKED;
+
+static void outPutSensorPower(bool on) {
+  if(on) {
+    pinMode(PIN_SENSOR_POWER1, OUTPUT);
+    pinMode(PIN_SENSOR_POWER2, OUTPUT);
+    gpio_set_drive_capability((gpio_num_t)PIN_SENSOR_POWER1, GPIO_DRIVE_CAP_3);
+    gpio_set_drive_capability((gpio_num_t)PIN_SENSOR_POWER2, GPIO_DRIVE_CAP_3);
+    digitalWrite(PIN_SENSOR_POWER1, HIGH);
+    digitalWrite(PIN_SENSOR_POWER2, HIGH);
+  } else {
+    // set the outputs to low to switch off the sensor
+    pinMode(PIN_SENSOR_POWER1, OUTPUT);
+    pinMode(PIN_SENSOR_POWER2, OUTPUT);
+    gpio_set_drive_capability((gpio_num_t)PIN_SENSOR_POWER1, GPIO_DRIVE_CAP_3);
+    gpio_set_drive_capability((gpio_num_t)PIN_SENSOR_POWER2, GPIO_DRIVE_CAP_3);
+    digitalWrite(PIN_SENSOR_POWER1, LOW);
+    digitalWrite(PIN_SENSOR_POWER2, LOW);
+  }
+}
 
 static void liveStore(const Reading &r) {
   portENTER_CRITICAL(&liveMux);
@@ -70,11 +95,18 @@ static Reading measure(const Settings &cfg) {
   Reading r{};
 
   // Power the sensor only while measuring.
-  pinMode(PIN_SENSOR_POWER, OUTPUT);
-  digitalWrite(PIN_SENSOR_POWER, HIGH);
-  delay(100);  // let the sensor oscillator settle
+  outPutSensorPower(true);
+#ifdef DEBUG_SETTLE_LOG
+  // Shows how long the output needs after power-on: tune SENSOR_SETTLE_MS from this.
+  for (int t = 0; t <= 10000; t += 50) {
+    LOGF("settle %4d ms: %u mV", t, (unsigned)readMv(PIN_SENSOR_ADC));
+    delay(50-32);
+  }
+#else
+  delay(SENSOR_SETTLE_MS);  // sensor oscillator and output filter must settle
+#endif
   r.rawMv = readMv(PIN_SENSOR_ADC);
-  digitalWrite(PIN_SENSOR_POWER, LOW);
+  outPutSensorPower(false);
 
   // Capacitive sensor: higher voltage = drier soil.
   long span = (long)cfg.rawDry - cfg.rawWet;

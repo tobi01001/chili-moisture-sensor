@@ -8,6 +8,7 @@
 #include <esp_sleep.h>
 #include <driver/gpio.h>
 #include "debug.h"
+#include "led.h"
 #include "settings.h"
 #include "sensor.h"
 #include "logic.h"
@@ -26,6 +27,7 @@ RTC_DATA_ATTR static uint32_t lastSleepMin = 0;
   WiFi.mode(WIFI_OFF);
 
   outPutSensorPower(false);
+  ledSleep();
   gpio_hold_en((gpio_num_t)PIN_SENSOR_POWER1);
   gpio_hold_en((gpio_num_t)PIN_SENSOR_POWER2);
   gpio_pullup_en((gpio_num_t)PIN_BUTTON);
@@ -47,13 +49,14 @@ static bool cycle(uint32_t elapsedMin) {
   LOGF("raw=%u mV moisture=%u%% supply=%u mV usb=%d water=%d send=%d",
        r.rawMv, r.moisture, r.supplyMv, r.usb, r.needsWater, send);
   if (!send) return true;
-  debugFlash(3);
+  ledSetSending(true);
   if (cfg.useBle()) bleSend(r);  // fire and forget, no acknowledgement
   bool ok = true;
   if (cfg.useWifi()) {
     ok = (WiFi.status() == WL_CONNECTED || connectWifi(cfg)) && sendToFhem(cfg, r);
     if (!ok) wifiCacheInvalidate();  // next attempt: full connect with fresh DHCP
   }
+  ledSetSending(false);
   if (ok) markSent(r);
   return ok;
 }
@@ -101,6 +104,7 @@ static bool wokenByButton(esp_sleep_wakeup_cause_t cause) {
 }
 
 void setup() {
+  ledBegin();
   debugBegin();
   LOG("Starting setup...");
   cfg.load();
@@ -120,6 +124,7 @@ void setup() {
   if (portalMode || usbMode) {
     // Web server up: loop() serves it and keeps measuring/sending.
     portalTimeLimited = portalMode && !usbMode;
+    ledSetMode(LED_PORTAL);
     startNetwork(cfg, portalMode);
     addRoutes(cfg);
     xTaskCreate(measureTask, "measure", 10240, nullptr, 1, nullptr);
@@ -132,7 +137,6 @@ void setup() {
 
 void loop() {
   server.handleClient();
-  debugLoop();
 
   static uint32_t restartAt = 0;  // 0 = no restart pending; gives the HTTP response time to go out
   bool portalExpired = portalTimeLimited && portalExpiredNow();

@@ -39,6 +39,7 @@ meldet sie bei Bedarf an FHEM und liefert eine Gießempfehlung („Gießen: ja/n
 | F14 | USB-Betrieb: kein Deep Sleep, Messung im Intervall in der Hauptschleife. |
 | F18 | Die Portalseite (HTML/CSS/JS) liegt im Dateisystem (LittleFS, Ordner `data/`); die Firmware liefert sie aus und stellt eine JSON-API bereit. Messwerte werden von der Seite selbständig aktualisiert. |
 | F19 | Einschwingmessung per Portal: schaltet den Sensor kalt ein und zeichnet den Ausgang (50-ms-Raster, bis 10 s) im Messtask auf; die Seite zeigt Kurve, Werte und einen Vorschlag für die Einschwingzeit. |
+| F20 | Status-LED (blau, GPIO8), per Timer angesteuert: dauerhaft an nach dem Aufwachen/Messen, Flackern beim Senden, 1-s-Blinken (200 ms an) bei laufendem Portal, aus im Deep Sleep. |
 
 ## 4. Nichtfunktionale Anforderungen
 | ID | Anforderung |

@@ -85,6 +85,10 @@ Das Board hat **keinen Lader**, Laden erfolgt extern. **USB und Akku niemals gle
 Die **rote Power-LED** (an VSYS) zieht dauerhaft Strom und sollte entfernt werden. Der ME6211 braucht selbst
 rund 50 µA.
 
+**Status-LED** (blaue LED an GPIO8, `PIN_STATUS_LED`/`STATUS_LED_ON` änderbar): leuchtet dauerhaft, solange das
+Gerät aus dem Deep Sleep erwacht ist und misst; flackert beim Senden (WLAN/Bluetooth); blinkt im Sekundentakt
+(200 ms an, 800 ms aus), solange das Portal läuft. Im Deep Sleep ist sie aus.
+
 ## Betriebsmodi
 | Modus | Verhalten |
 |---|---|

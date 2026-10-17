@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <driver/gpio.h>
+#include <soc/gpio_reg.h>
 #include "settings.h"
 
 // Above this supply voltage (at the 5V pin) we assume USB; a LiPo never exceeds 4.2 V.
@@ -23,23 +24,15 @@ static Reading liveReading;
 static bool liveValid = false;
 static portMUX_TYPE liveMux = portMUX_INITIALIZER_UNLOCKED;
 
+// Both pins drive the same sensor VCC node, so their levels must change in a single register
+// write (never one after the other) and be preloaded before the output drivers are enabled.
 static void outPutSensorPower(bool on) {
-  if(on) {
-    pinMode(PIN_SENSOR_POWER1, OUTPUT);
-    pinMode(PIN_SENSOR_POWER2, OUTPUT);
-    gpio_set_drive_capability((gpio_num_t)PIN_SENSOR_POWER1, GPIO_DRIVE_CAP_3);
-    gpio_set_drive_capability((gpio_num_t)PIN_SENSOR_POWER2, GPIO_DRIVE_CAP_3);
-    digitalWrite(PIN_SENSOR_POWER1, HIGH);
-    digitalWrite(PIN_SENSOR_POWER2, HIGH);
-  } else {
-    // set the outputs to low to switch off the sensor
-    pinMode(PIN_SENSOR_POWER1, OUTPUT);
-    pinMode(PIN_SENSOR_POWER2, OUTPUT);
-    gpio_set_drive_capability((gpio_num_t)PIN_SENSOR_POWER1, GPIO_DRIVE_CAP_3);
-    gpio_set_drive_capability((gpio_num_t)PIN_SENSOR_POWER2, GPIO_DRIVE_CAP_3);
-    digitalWrite(PIN_SENSOR_POWER1, LOW);
-    digitalWrite(PIN_SENSOR_POWER2, LOW);
-  }
+  const uint32_t mask = (1UL << PIN_SENSOR_POWER1) | (1UL << PIN_SENSOR_POWER2);
+  REG_WRITE(on ? GPIO_OUT_W1TS_REG : GPIO_OUT_W1TC_REG, mask);
+  pinMode(PIN_SENSOR_POWER1, OUTPUT);
+  pinMode(PIN_SENSOR_POWER2, OUTPUT);
+  gpio_set_drive_capability((gpio_num_t)PIN_SENSOR_POWER1, GPIO_DRIVE_CAP_3);
+  gpio_set_drive_capability((gpio_num_t)PIN_SENSOR_POWER2, GPIO_DRIVE_CAP_3);
 }
 
 static void liveStore(const Reading &r) {
